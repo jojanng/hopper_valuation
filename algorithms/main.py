@@ -1,5 +1,5 @@
-import stock_fft.algorithms.market_data as mkdata
-import stock_fft.algorithms.pricing as prc
+import market_data as mkdata
+import pricing as prc
 import yfinance as yf
 
 def get_market_parameters(symbol):
