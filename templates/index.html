@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Analysis</title>
+    <script>
+        let selectedModel = null;
+
+        function selectModel(model) {
+            selectedModel = model;
+            document.getElementById('pricing-section').style.display = 'block';
+            document.getElementById('pricing-title').innerText = model === 'options' ? 'Options Pricing' : 'Stock Pricing';
+
+            // No need Strike Price input for Stock Pricing
+            document.getElementById('strike-group').style.display = model === 'options' ? 'block' : 'none';
+        }
+
+        async function fetchStockData() {
+            const symbol = document.getElementById('symbol').value;
+            if (!symbol) {
+                alert("Please enter a stock symbol");
+                return;
+            }
+            const response = await fetch(`/stock-data?symbol=${symbol}`);
+            const data = await response.json();
+
+            if (data.error) {
+                document.getElementById('stock-result').innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+            } else {
+                document.getElementById('stock-result').innerHTML = `
+                    <h3>Market Parameters for ${data.symbol}</h3>
+                    <p><strong>Current Price:</strong> $${data.current_price.toFixed(2)}</p>
+                    <p><strong>Historical Volatility:</strong> ${(data.historical_volatility * 100).toFixed(1)}%</p>
+                    <p><strong>Risk-Free Rate:</strong> ${(data.risk_free_rate * 100).toFixed(1)}%</p>
+                    <p><strong>Dividend Yield:</strong> ${(data.dividend_yield * 100).toFixed(1)}%</p>
+                `;
+            }
+        }
+
+        async function fetchPricing() {
+            const symbol = document.getElementById('symbol').value;
+            const maturity = document.getElementById('maturity').value;
+            let strike = null;
+
+            if (selectedModel === 'options') {
+                strike = document.getElementById('strike').value;
+                if (!strike) {
+                    alert("Enter a Strike Price for Options Pricing");
+                    return;
+                }
+            }
+            if (!symbol || !maturity) {
+                alert("Enter all required fields");
+                return;
+            }
+
+            let requestUrl = `/pricing?symbol=${symbol}&time_to_maturity=${maturity}`;
+            if (strike) requestUrl += `&strike_price=${strike}`;
+
+            const response = await fetch(requestUrl);
+            const data = await response.json();
+
+            if (data.error) {
+                document.getElementById('pricing-result').innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+            } else {
+                document.getElementById('pricing-result').innerHTML = `
+                    <h3>${selectedModel === 'options' ? "Options Pricing" : "Stock Pricing"}</h3>
+                    ${selectedModel === 'options' ? `
+                        <p><strong>Call Option Price:</strong> $${data.call_price.toFixed(2)}</p>
+                        <p><strong>Put Option Price:</strong> $${data.put_price.toFixed(2)}</p>
+                        <p><strong>Probability Stock > Strike Price:</strong> ${(data.probability_above_strike * 100).toFixed(2)}%</p>
+                    ` : `
+                        <p><strong>Expected Stock Price in ${maturity} ${maturity == 1 ? "year" : "years"}:</strong> $${data.expected_price.toFixed(2)}</p>
+                        <p><strong>Intrinsic Value Per Share:</strong> $${data.intrinsic_value_per_share.toFixed(2)}</p>
+                        <p><strong>Free Cash Flow (FCF):</strong> $${data.fcf.toFixed(2)} billion</p>
+                        <p><strong>Growth Rate:</strong> ${(data.growth_rate * 100).toFixed(1)}%</p>
+                        <p><strong>Discount Rate:</strong> ${(data.discount_rate * 100).toFixed(1)}%</p>
+                        <p><strong>P/E Ratio:</strong> ${data.pe_ratio.toFixed(2)}</p>
+                        <p><strong>Earnings Growth:</strong> ${(data.earnings_growth * 100).toFixed(1)}%</p>
+                        <p><strong>PEG Ratio:</strong> ${data.peg_ratio ? data.peg_ratio.toFixed(2) : "N/A"}</p>
+                    `}
+                `;
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Stock Analysis Tool</h1>
+
+    <!-- Stock Symbol Input -->
+    <label for="symbol">Stock Symbol:</label>
+    <input type="text" id="symbol" placeholder="AAPL">
+    <button onclick="fetchStockData()">Get Data</button>
+    <div id="stock-result"></div>
+
+    <!-- Models -->
+    <h2>Choose Model</h2>
+    <button onclick="selectModel('options')">Options Pricing</button>
+    <button onclick="selectModel('stocks')">Stock Pricing</button>
+
+    <!-- Pricing Inputs -->
+    <div id="pricing-section" style="display: none;">
+        <h2 id="pricing-title"></h2>
+        
+        <!-- Strike Price -->
+        <div id="strike-group" style="display: none;">
+            <label for="strike">Strike Price:</label>
+            <input type="number" id="strike">
+        </div>
+
+        <label for="maturity">Maturity (years):</label>
+        <input type="number" id="maturity">
+
+        <button onclick="fetchPricing()">Get Pricing</button>
+    </div>
+
+    <div id="pricing-result"></div>
+</body>
+</html>
