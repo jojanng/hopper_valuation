@@ -10,3 +10,7 @@
    carr madan fft uses fft to compute option and probabilities distributions and stock_price_algo predicts the stock price expected value at T
 
 -**PARTIALLY COMPLETED** design website and functions (track options, predict stocks, easy technical analysis on stocks, etc)
+
+-PROBLEMS:
+    check earning growth (negative weird example pltr is -29%)
+    negative earning growth leads to inaccurate data for intrinsic value

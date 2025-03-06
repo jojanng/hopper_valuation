@@ -1,12 +1,20 @@
 This is a python project for forcasting optionS and stocks prices using the fast Fourier transform algorithm.
 
-Introduction
+**Introduction**
+Pricing analysis of stock and options across exchanges, incorporating market trends, historical volatility, risk-free rates, and valuation models like FFT-based Black-Scholes and discounted cash flow (DCF).
 
-Documentation
+**Documentation**
+-Empty
 
-Studies (tests)
+**Studies (tests)**
+-Empty
 
-Getting started
+**Getting started**
+pip install Flask
+pip install yfinance
+pip install scipy
+pip install numpy
+pip install pandas (currently not in use)
 
 
-*Reference university of maryland carr madan study on option valuation using fft*
+*Reference University of Maryland Carr-Madan study on option valuation using FFT*
