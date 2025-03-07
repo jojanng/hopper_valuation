@@ -2,7 +2,7 @@ import yfinance as yf
 import numpy as np
 from scipy.fft import fft
 from scipy.stats import norm
-from market_data import get_analyst_growth_estimates, get_manual_fcf
+from algorithms.market_data import get_analyst_growth_estimates, get_manual_fcf
 
 
 def get_financial_data(symbol):
@@ -142,6 +142,31 @@ def pe_based_valuation(eps, growth_rate, target_pe=None):
         'target_pe': target_pe,
         'fair_value': fair_value
     }
+
+def peg_ratio(pe_ratio, growth_rate):
+    """
+    Calculate the Price/Earnings to Growth (PEG) ratio
+    
+    Parameters:
+        pe_ratio (float): The Price/Earnings ratio
+        growth_rate (float): The growth rate as a decimal (e.g., 0.15 for 15%)
+        
+    Returns:
+        float: The PEG ratio (PE ratio divided by growth rate percentage)
+        
+    A PEG ratio of 1 is considered fair value.
+    Less than 1 may indicate undervaluation, greater than 1 may indicate overvaluation.
+    """
+    if pe_ratio is None or growth_rate <= 0:
+        return None
+    
+    # Convert growth rate to percentage for PEG calculation
+    growth_rate_percent = growth_rate * 100
+    
+    # Calculate PEG ratio
+    peg = pe_ratio / growth_rate_percent
+    
+    return peg
 
 def ev_ebitda_valuation(ebitda, growth_rate, net_debt, shares_outstanding):
     """

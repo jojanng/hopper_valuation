@@ -3,118 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Analysis</title>
-    <script>
-        let selectedModel = null;
-
-        function selectModel(model) {
-            selectedModel = model;
-            document.getElementById('pricing-section').style.display = 'block';
-            document.getElementById('pricing-title').innerText = model === 'options' ? 'Options Pricing' : 'Stock Pricing';
-
-            // No need Strike Price input for Stock Pricing
-            document.getElementById('strike-group').style.display = model === 'options' ? 'block' : 'none';
-        }
-
-        async function fetchStockData() {
-            const symbol = document.getElementById('symbol').value;
-            if (!symbol) {
-                alert("Please enter a stock symbol");
-                return;
-            }
-            const response = await fetch(`/stock-data?symbol=${symbol}`);
-            const data = await response.json();
-
-            if (data.error) {
-                document.getElementById('stock-result').innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
-            } else {
-                document.getElementById('stock-result').innerHTML = `
-                    <h3>Market Parameters for ${data.symbol}</h3>
-                    <p><strong>Current Price:</strong> $${data.current_price.toFixed(2)}</p>
-                    <p><strong>Historical Volatility:</strong> ${(data.historical_volatility * 100).toFixed(1)}%</p>
-                    <p><strong>Risk-Free Rate:</strong> ${(data.risk_free_rate * 100).toFixed(1)}%</p>
-                    <p><strong>Dividend Yield:</strong> ${(data.dividend_yield * 100).toFixed(1)}%</p>
-                `;
-            }
-        }
-
-        async function fetchPricing() {
-            const symbol = document.getElementById('symbol').value;
-            const maturity = document.getElementById('maturity').value;
-            let strike = null;
-
-            if (selectedModel === 'options') {
-                strike = document.getElementById('strike').value;
-                if (!strike) {
-                    alert("Enter a Strike Price for Options Pricing");
-                    return;
-                }
-            }
-            if (!symbol || !maturity) {
-                alert("Enter all required fields");
-                return;
-            }
-
-            let requestUrl = `/pricing?symbol=${symbol}&time_to_maturity=${maturity}`;
-            if (strike) requestUrl += `&strike_price=${strike}`;
-
-            const response = await fetch(requestUrl);
-            const data = await response.json();
-
-            if (data.error) {
-                document.getElementById('pricing-result').innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
-            } else {
-                document.getElementById('pricing-result').innerHTML = `
-                    <h3>${selectedModel === 'options' ? "Options Pricing" : "Stock Pricing"}</h3>
-                    ${selectedModel === 'options' ? `
-                        <p><strong>Call Option Price:</strong> $${data.call_price.toFixed(2)}</p>
-                        <p><strong>Put Option Price:</strong> $${data.put_price.toFixed(2)}</p>
-                        <p><strong>Probability Stock > Strike Price:</strong> ${(data.probability_above_strike * 100).toFixed(2)}%</p>
-                    ` : `
-                        <p><strong>Expected Stock Price in ${maturity} ${maturity == 1 ? "year" : "years"}:</strong> $${data.expected_price.toFixed(2)}</p>
-                        <p><strong>Intrinsic Value Per Share:</strong> $${data.intrinsic_value_per_share.toFixed(2)}</p>
-                        <p><strong>Free Cash Flow (FCF):</strong> $${data.fcf.toFixed(2)} billion</p>
-                        <p><strong>Growth Rate:</strong> ${(data.growth_rate * 100).toFixed(1)}%</p>
-                        <p><strong>Discount Rate:</strong> ${(data.discount_rate * 100).toFixed(1)}%</p>
-                        <p><strong>P/E Ratio:</strong> ${data.pe_ratio.toFixed(2)}</p>
-                        <p><strong>Earnings Growth:</strong> ${(data.earnings_growth * 100).toFixed(1)}%</p>
-                        <p><strong>PEG Ratio:</strong> ${data.peg_ratio ? data.peg_ratio.toFixed(2) : "N/A"}</p>
-                    `}
-                `;
-            }
-        }
-    </script>
+    <title>Stock Analysis & Valuation</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <h1>Stock Analysis Tool</h1>
-
-    <!-- Stock Symbol Input -->
-    <label for="symbol">Stock Symbol:</label>
-    <input type="text" id="symbol" placeholder="AAPL">
-    <button onclick="fetchStockData()">Get Data</button>
-    <div id="stock-result"></div>
-
-    <!-- Models -->
-    <h2>Choose Model</h2>
-    <button onclick="selectModel('options')">Options Pricing</button>
-    <button onclick="selectModel('stocks')">Stock Pricing</button>
-
-    <!-- Pricing Inputs -->
-    <div id="pricing-section" style="display: none;">
-        <h2 id="pricing-title"></h2>
-        
-        <!-- Strike Price -->
-        <div id="strike-group" style="display: none;">
-            <label for="strike">Strike Price:</label>
-            <input type="number" id="strike">
+    <header>
+        <div class="container">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+                <span>StockValuator</span>
+            </div>
         </div>
+    </header>
 
-        <label for="maturity">Maturity (years):</label>
-        <input type="number" id="maturity">
-
-        <button onclick="fetchPricing()">Get Pricing</button>
+    <div class="container">
+        <div class="card">
+            <h1>Stock Analysis & Valuation</h1>
+            <p>Enter a stock symbol to analyze its market parameters and calculate its intrinsic value.</p>
+            
+            <div class="input-group">
+                <label for="symbol">Stock Symbol:</label>
+                <input type="text" id="symbol" placeholder="e.g., AAPL, MSFT, GOOGL" autocomplete="off">
+            </div>
+            
+            <button id="fetch-data-btn" class="btn btn-primary">
+                <i class="fas fa-search"></i> Get Stock Data
+            </button>
+            
+            <div id="error-message" class="error-message"></div>
+            
+            <div id="loading" class="loading">
+                <div class="loading-spinner"></div>
+                <p>Loading data...</p>
+            </div>
+        </div>
+        
+        <div id="stock-result" class="card result-section">
+            <h2>Market Parameters</h2>
+            <div id="stock-data-grid" class="data-grid"></div>
+            
+            <h2>Choose Analysis Model</h2>
+            <div class="btn-group">
+                <button class="btn model-btn" data-model="options" disabled>
+                    <i class="fas fa-exchange-alt"></i> Options Pricing
+                </button>
+                <button class="btn model-btn" data-model="stocks" disabled>
+                    <i class="fas fa-chart-bar"></i> Stock Valuation
+                </button>
+            </div>
+        </div>
+        
+        <div id="pricing-section" class="card result-section" style="display: none;">
+            <h2 id="pricing-title">Pricing Analysis</h2>
+            
+            <div id="strike-group" class="input-group" style="display: none;">
+                <label for="strike">Strike Price ($):</label>
+                <input type="number" id="strike" step="0.01" min="0">
+            </div>
+            
+            <div id="fcf-group" class="input-group" style="display: none;">
+                <label for="fcf-input">Free Cash Flow (Billions $):</label>
+                <div class="input-with-button">
+                    <input type="number" id="fcf-input" step="0.01" min="0" placeholder="e.g., 108.8">
+                    <button id="fcf-update-btn" class="btn btn-small">
+                        <i class="fas fa-check"></i> Update
+                    </button>
+                </div>
+                <small class="input-help">Enter the TTM Free Cash Flow in billions (as shown on Yahoo Finance)</small>
+            </div>
+            
+            <div class="input-group">
+                <label for="maturity">Time to Maturity (years):</label>
+                <input type="number" id="maturity" value="1" min="0.1" step="0.1">
+            </div>
+            
+            <button id="calculate-btn" class="btn">
+                <i class="fas fa-calculator"></i> Calculate
+            </button>
+        </div>
+        
+        <!-- Pricing Results Section -->
+        <div id="pricing-result" class="card result-section" style="display: none;">
+            <h2>Valuation Results</h2>
+            <div id="pricing-data-grid" class="data-grid"></div>
+            
+            <div id="valuation-summary" style="display: none;"></div>
+            
+            <div id="valuation-chart" class="chart-container" style="display: none;">
+                <canvas id="chart"></canvas>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" data-target="tab-valuation">Valuation</div>
+                <div class="tab" data-target="tab-methodology">Methodology</div>
+            </div>
+            
+            <div id="tab-valuation" class="tab-content active">
+                <h3>About Our Valuation Model</h3>
+                <p>Our stock valuation model combines multiple approaches to provide a comprehensive assessment:</p>
+                <ul>
+                    <li><strong class="tooltip" data-term="intrinsic-value">Discounted Cash Flow (DCF)</strong> - Calculates the present value of expected future cash flows.</li>
+                    <li><strong class="tooltip" data-term="pe-ratio">Price-to-Earnings (P/E) Ratio</strong> - Compares the stock's price to its earnings per share.</li>
+                    <li><strong class="tooltip" data-term="peg-ratio">PEG Ratio</strong> - Factors in the company's growth rate to provide context for the P/E ratio.</li>
+                </ul>
+            </div>
+            
+            <div id="tab-methodology" class="tab-content">
+                <h3>Methodology</h3>
+                <p>Our valuation methodology incorporates:</p>
+                <ul>
+                    <li><strong>Free Cash Flow Analysis</strong> - We analyze the company's ability to generate cash after accounting for capital expenditures.</li>
+                    <li><strong>Growth Rate Estimation</strong> - We use analyst forecasts and historical data to project future growth.</li>
+                    <li><strong>Risk-Adjusted Discount Rate</strong> - We apply a discount rate that reflects the company's risk profile and the time value of money.</li>
+                    <li><strong>Terminal Value Calculation</strong> - We estimate the company's value beyond our explicit forecast period.</li>
+                </ul>
+                <p>For options pricing, we use the Fast Fourier Transform (FFT) method to efficiently calculate option prices under various market conditions.</p>
+            </div>
+        </div>
     </div>
-
-    <div id="pricing-result"></div>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
