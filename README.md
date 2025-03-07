@@ -14,7 +14,7 @@ pip install Flask
 pip install yfinance
 pip install scipy
 pip install numpy
-pip install pandas (currently not in use)
+pip install pandas
 
 
 *Reference University of Maryland Carr-Madan study on option valuation using FFT*
