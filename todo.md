@@ -6,11 +6,16 @@
 
 -graphs: density x % and stock price prediction x pdf (full distribution)
 
+-implement wider and more complex fft methods
+
+-improve accuracy of valuation models (especially with higher fcf)
+
 -write in documentation: differences between the both prediction algo
    carr madan fft uses fft to compute option and probabilities distributions and stock_price_algo predicts the stock price expected value at T
 
--**PARTIALLY COMPLETED** design website and functions (track options, predict stocks, easy technical analysis on stocks, etc)
+-**COMPLETED BUT NEEDS CONSTANT UPDATES** design website and functions (track options, predict stocks, easy technical analysis on stocks, etc)
 
 -PROBLEMS:
-    check earning growth (negative weird example pltr is -29%)
-    negative earning growth leads to inaccurate data for intrinsic value
+    **FIXED BUT ACCURACY NOT 100%** check earning growth (negative weird example pltr is -29%) : negative earning growth leads to inaccurate data for intrinsic value
+
+    

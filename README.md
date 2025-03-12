@@ -1,15 +1,15 @@
-This is a python project for forcasting optionS and stocks prices using the fast Fourier transform algorithm.
+This is a python project for analyzing options and stocks prices using the Fast Fourier Transform based Carr-Madan model approach, Discounted Cash Flow model and multiples.
 
 **Introduction**
-Pricing analysis of stock and options across exchanges, incorporating market trends, historical volatility, risk-free rates, and valuation models like FFT-based Black-Scholes and discounted cash flow (DCF).
+
+Pricing analysis of stocks and options across exchanges involves integrating market trends, historical volatility, risk-free rates, and valuation models such as DCF, multiples, and implied volatility methods to estimate fair values across varying strikes, maturities, and fundamentals.
 
 **Documentation**
--Empty
 
-**Studies (tests)**
--Empty
+FFT frameworks: Black-Scholes, Implied Volatility Curves, Risk‐Neutral Density Extraction, Heston (stochastic volatility), Merton / Kou (jump–diffusion), Bates (jump–diffusion + stochastic vol), Sensitivity Analysis (Greeks),  Full Strike Surface
 
 **Getting started**
+
 pip install Flask
 pip install yfinance
 pip install scipy
