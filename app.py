@@ -1,417 +1,574 @@
-from flask import Flask, request, jsonify, render_template
-from algorithms import market_data as mkdata
-from algorithms import pricing as prc
-import yfinance as yf
-import traceback
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+#!/usr/bin/env python3
+"""
+Advanced Stock Valuation Web Application
 
+This Flask application provides a web interface to the advanced stock valuation
+functionality from the qualtrim_backend services and advanced_valuation_example.py.
+It offers the same precision and accuracy as the command-line version.
+"""
+
+import os
+import sys
+import json
+import asyncio
+import logging
+from datetime import datetime, timedelta
+import numpy as np
+from flask import Flask, request, jsonify, render_template, send_from_directory
+
+# Add the parent directory to the path so we can import the qualtrim_backend package
+sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
+
+# Import qualtrim_backend services
+from qualtrim_backend.services.market_data.service import MarketDataService
+from qualtrim_backend.services.valuation.service import ValuationService
+from qualtrim_backend.config.config import Settings
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize Flask app
 app = Flask(__name__)
 
-# Store FCF values for symbols
-fcf_cache = {}
+# Initialize qualtrim_backend services
+settings = Settings()
+market_data_service = MarketDataService(config=settings)
+valuation_service = ValuationService(market_data_service, config={})
+
+# Helper function to run async functions in Flask
+def run_async(coro):
+    """Run an async coroutine in the Flask context."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 @app.route('/')
-def home():
-    return render_template("index.html")
+def index():
+    """Render the main page of the application."""
+    return render_template('index.html')
 
-@app.route('/stock-data', methods=['GET'])
-def get_stock_data():
-    symbol = request.args.get('symbol', '').upper()
-    
-    if not symbol:
-        return jsonify({"error": "Stock symbol is required"}), 400
+@app.route('/static/<path:path>')
+def serve_static(path):
+    """Serve static files."""
+    return send_from_directory('static', path)
 
+@app.route('/api/symbols', methods=['GET'])
+def get_symbols():
+    """Get available stock symbols."""
     try:
-        S0, sigma, r, q = get_market_parameters(symbol)
-        
-        # Get annual FCF for reference
-        stock = yf.Ticker(symbol)
-        cashflow = stock.cashflow
-        annual_fcf = 0
-        
-        if "Free Cash Flow" in cashflow.index:
-            annual_fcf = cashflow.loc["Free Cash Flow"].iloc[0]
-            # Store in cache as default
-            fcf_cache[symbol] = annual_fcf
-        
-        return jsonify({
-            "symbol": symbol,
-            "current_price": S0,
-            "historical_volatility": sigma,
-            "risk_free_rate": r,
-            "dividend_yield": q,
-            "annual_fcf": annual_fcf / 1e9  # Convert to billions for display
-        })
+        # Return a list of common stock symbols
+        # In a production environment, this would be fetched from a database or API
+        symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'PLTR', 'ASML', 'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'UNH', 'HD', 'BAC', 'INTC', 'VZ', 'ADBE', 'NFLX', 'CSCO', 'PFE', 'CRM', 'ABT', 'KO', 'PEP', 'NKE', 'T', 'MRK', 'DIS']
+        return jsonify({"symbols": symbols})
     except Exception as e:
-        app.logger.error(f"Error fetching stock data: {str(e)}")
-        app.logger.error(traceback.format_exc())
+        logger.error(f"Error fetching symbols: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-def get_market_parameters(symbol):
-    """Fetch market parameters"""
-    S0 = mkdata.get_current_price(symbol)
-    sigma = mkdata.get_historical_volatility(symbol)
-    r = 0.0425  # Risk-free rate
-    div = yf.Ticker(symbol).info.get('dividendYield', 0.0) or 0.0
-    q = div / 100
-    return S0, sigma, r, q
-
-@app.route('/set-fcf', methods=['POST'])
-def set_fcf():
-    """Set the FCF value for a symbol"""
-    data = request.json
-    symbol = data.get('symbol', '').upper()
-    fcf_value = data.get('fcf_value')
-    
-    if not symbol or fcf_value is None:
-        return jsonify({"error": "Symbol and FCF value are required"}), 400
-    
+@app.route('/api/valuation', methods=['POST'])
+def perform_valuation():
+    """Perform advanced valuation analysis based on the provided parameters."""
     try:
-        # Convert to float and store in billions
-        fcf_cache[symbol] = float(fcf_value) * 1e9
-        return jsonify({"success": True, "message": f"FCF for {symbol} set to ${fcf_value}B"})
-    except ValueError:
-        return jsonify({"error": "Invalid FCF value"}), 400
-
-@app.route('/historical-data', methods=['GET'])
-def get_historical_data():
-    """Get historical price and intrinsic value data for a symbol"""
-    symbol = request.args.get('symbol', '').upper()
-    period = request.args.get('period', '1y')  # Default to 1 year
-    
-    if not symbol:
-        return jsonify({"error": "Stock symbol is required"}), 400
-    
-    try:
-        # Get historical stock prices
-        stock = yf.Ticker(symbol)
-        hist_prices = stock.history(period=period)
+        # Get request data
+        data = request.json
+        symbol = data.get('symbol', 'AAPL').upper()
         
-        if hist_prices.empty:
-            return jsonify({"error": f"No historical data found for {symbol}"}), 404
+        logger.info(f"Performing valuation for symbol: {symbol}")
         
-        # First, get the current intrinsic value from the pricing endpoint
-        # This ensures consistency between the graph and the valuation summary
+        # Extract parameters with defaults
+        fcf_growth = data.get('fcf_growth', 15) / 100  # Convert to decimal
+        eps_growth = data.get('eps_growth', 20) / 100  # Convert to decimal
+        ebitda_growth = data.get('ebitda_growth', 18) / 100  # Convert to decimal
+        fcf_yield = data.get('fcf_yield', 4) / 100  # Convert to decimal
+        terminal_pe = data.get('terminal_pe', 15)
+        eps_multiple = data.get('eps_multiple', 20)  # New EPS multiple parameter
+        desired_return = data.get('desired_return', 15) / 100  # Convert to decimal
+        years = int(data.get('years', 5))
+        projection_years = int(data.get('projection_years', 5))  # New projection years parameter
+        sbc_impact = data.get('sbc_impact', 0) / 100  # Convert to decimal
+        
+        # Weights for weighted average calculation
+        fcf_weight = data.get('fcf_weight', 50) / 100  # Convert to decimal
+        eps_weight = data.get('eps_weight', 30) / 100  # Convert to decimal
+        ev_ebitda_weight = data.get('ev_ebitda_weight', 20) / 100  # Convert to decimal
+        use_ev_ebitda = data.get('use_ev_ebitda', True)
+        include_sensitivity = data.get('sensitivity', False)
+        
         try:
-            # Check if we have a cached FCF value
-            if symbol not in fcf_cache:
-                # Get a default FCF value from annual data
-                cashflow = stock.cashflow
-                if "Free Cash Flow" in cashflow.index:
-                    fcf_cache[symbol] = cashflow.loc["Free Cash Flow"].iloc[0]
-                else:
-                    # If no FCF data available, use a placeholder
-                    fcf_cache[symbol] = 0
+            # Fetch market data using the qualtrim_backend services
+            current_price = run_async(market_data_service.get_current_price(symbol))
+            financial_data = run_async(market_data_service.get_financial_data(symbol))
             
-            # Use cached FCF instead of prompting
-            fcf = fcf_cache[symbol]
-            
-            # Get other financial data directly without using get_intrinsic_value_data
-            info = stock.info
-            
-            # Get growth rates from analyst estimates or use defaults
-            earnings_growth = info.get("earningsGrowth", 0.05) or 0.05
-            revenue_growth = info.get("revenueGrowth", 0.03) or 0.03
-            
-            # Cap growth rates to reasonable values
-            growth_rate = max(min(earnings_growth, 0.30), 0.05)  # Cap between 5% and 30%
-            terminal_growth_rate = max(min(revenue_growth if revenue_growth and revenue_growth > 0 else 0.02, 0.03), 0.01)  # Cap between 1% and 3%
-            
-            # Discount rate (default to 8%)
-            discount_rate = 0.08
-            
-            # P/E ratio (trailing P/E) (default 15 if unavailable)
-            pe_ratio = info.get("trailingPE", 15) or 15
-            
-            # Get shares outstanding and net debt
-            shares_outstanding = stock.info.get("sharesOutstanding", 0) or 1
-            total_debt = stock.info.get("totalDebt", 0) or 0
-            cash_and_equivalents = stock.info.get("totalCash", 0) or 0
+            # Extract relevant data
+            shares_outstanding = financial_data.get('sharesOutstanding', 0)
+            fcf = financial_data.get('freeCashFlow', 0)
+            net_income = financial_data.get('netIncome', 0)
+            ebitda = financial_data.get('ebitda', 0)
+            total_debt = financial_data.get('totalDebt', 0)
+            cash_and_equivalents = financial_data.get('cashAndEquivalents', 0)
             net_debt = total_debt - cash_and_equivalents
             
-            # Calculate current intrinsic value
-            dcf_result = prc.discounted_cash_flow(
-                fcf, 
-                growth_rate, 
-                discount_rate, 
-                terminal_growth=terminal_growth_rate,
-                net_debt=net_debt,
-                shares_outstanding=shares_outstanding
-            )
+            # Calculate per share metrics
+            fcf_per_share = fcf / shares_outstanding if shares_outstanding > 0 else 0
+            eps = net_income / shares_outstanding if shares_outstanding > 0 else 0
             
-            current_intrinsic_value = dcf_result['per_share_value']
+            # Calculate P/E ratio
+            pe_ratio = current_price / eps if eps > 0 else 0
+            
+            # Apply SBC impact if provided
+            if sbc_impact > 0:
+                fcf = fcf * (1 - sbc_impact)
+                net_income = net_income * (1 - sbc_impact)
+                ebitda = ebitda * (1 - sbc_impact)
+                fcf_per_share = fcf / shares_outstanding if shares_outstanding > 0 else 0
+                eps = net_income / shares_outstanding if shares_outstanding > 0 else 0
             
         except Exception as e:
-            app.logger.error(f"Error getting financial data: {str(e)}")
-            return jsonify({"error": f"Failed to get financial data: {str(e)}"}), 500
+            logger.error(f"Error fetching data for {symbol}: {str(e)}")
+            return jsonify({
+                "error": f"Symbol '{symbol}' not found or error fetching data. Please use one of the available symbols from the symbol selector."
+            }), 404
         
-        # Prepare data for response
-        dates = hist_prices.index.strftime('%Y-%m-%d').tolist()
-        prices = hist_prices['Close'].tolist()
-        
-        # Get the current price
-        current_price = prices[-1]
-        
-        # Avoid division by zero
-        if current_intrinsic_value <= 0:
-            current_intrinsic_value = current_price * 0.9  # Default to 10% undervalued if calculation fails
-        
-        # Create more realistic historical intrinsic values
-        # Instead of maintaining a constant valuation difference, we'll create a more dynamic pattern
-        
-        # Get historical financial metrics if available
-        try:
-            # Get historical earnings data
-            earnings_history = stock.earnings_history
-            
-            # Get historical quarterly financials
-            quarterly_financials = stock.quarterly_financials
-            
-            # These will be used to influence the historical intrinsic values
-            has_financial_history = not (earnings_history is None or earnings_history.empty)
-        except:
-            has_financial_history = False
-        
-        # Generate historical intrinsic values with realistic variations
-        intrinsic_values = []
-        
-        # Number of data points
-        num_points = len(prices)
-        
-        # Create a base trend that follows the price movement but with variations
-        # We'll use a combination of:
-        # 1. Price trend (major component)
-        # 2. Random variations (to simulate changing market conditions)
-        # 3. Cyclical component (to simulate business cycles)
-        
-        # Calculate the current valuation ratio (price/intrinsic)
-        current_ratio = current_price / current_intrinsic_value
-        
-        # Create a random seed for reproducibility
-        np.random.seed(hash(symbol) % 10000)
-        
-        # Generate random variations (more realistic than constant ratio)
-        random_variations = np.random.normal(0, 0.05, num_points)  # 5% standard deviation
-        
-        # Add cyclical component (business cycles)
-        cycle_length = min(num_points // 2, 180)  # Half a year or half the data points
-        if cycle_length > 0:
-            cycles = np.sin(np.linspace(0, 2 * np.pi * (num_points / cycle_length), num_points))
-            cyclical_component = cycles * 0.03  # 3% amplitude
-        else:
-            cyclical_component = np.zeros(num_points)
-        
-        # Calculate trend component - gradually transition to current ratio
-        # This simulates how valuation metrics tend to revert to the mean over time
-        trend_component = np.linspace(current_ratio * 0.9, current_ratio, num_points)
-        
-        # Combine components to create historical ratios
-        historical_ratios = trend_component + random_variations + cyclical_component
-        
-        # Calculate intrinsic values based on historical prices and ratios
-        for i, price in enumerate(prices):
-            historical_intrinsic = price / historical_ratios[i]
-            intrinsic_values.append(round(historical_intrinsic, 2))
-        
-        # Ensure the last value matches exactly
-        intrinsic_values[-1] = round(current_intrinsic_value, 2)
-        
-        # Calculate the valuation difference percentage
-        valuation_diff_percent = round(((prices[-1] - intrinsic_values[-1]) / intrinsic_values[-1]) * 100, 1)
-        
-        # Log the values for debugging
-        app.logger.info(f"Current price: {current_price}, Intrinsic value: {current_intrinsic_value}")
-        app.logger.info(f"Valuation difference: {valuation_diff_percent}%")
-        
-        return jsonify({
-            "symbol": symbol,
-            "dates": dates,
-            "prices": prices,
-            "intrinsic_values": intrinsic_values,
-            "current_price": prices[-1],
-            "current_intrinsic_value": intrinsic_values[-1],
-            "valuation_diff_percent": valuation_diff_percent
-        })
-    except Exception as e:
-        app.logger.error(f"Error fetching historical data: {str(e)}")
-        app.logger.error(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/pricing', methods=['GET'])
-def get_pricing():
-    symbol = request.args.get('symbol', '').upper()
-    model_type = request.args.get('model_type', 'stocks')  # 'options' or 'stocks'
-    T = float(request.args.get('time_to_maturity', 1))
-    
-    if not symbol:
-        return jsonify({"error": "Stock symbol is required"}), 400
-
-    try:
-        app.logger.info(f"Processing pricing request for {symbol}, model_type={model_type}, T={T}")
-        
-        # Get market parameters
-        S0, sigma, r, q = get_market_parameters(symbol)
-        app.logger.info(f"Market parameters: S0={S0}, sigma={sigma}, r={r}, q={q}")
-        
-        # Common response data
-        response_data = {
-            "symbol": symbol,
-            "current_price": S0,
-            "historical_volatility": sigma,
-            "risk_free_rate": r,
-            "dividend_yield": q,
+        # Prepare market data for response
+        market_data_response = {
+            "current_price": current_price,
+            "shares_outstanding": shares_outstanding,
+            "fcf": fcf,
+            "net_income": net_income,
+            "ebitda": ebitda,
+            "fcf_per_share": fcf_per_share,
+            "eps": eps,
+            "pe_ratio": pe_ratio,  # Add P/E ratio to market data
+            "net_debt": net_debt
         }
         
-        if model_type == 'options':
-            # Options pricing
-            K = float(request.args.get('strike_price', 0))
-            if K <= 0:
-                return jsonify({"error": "Valid strike price is required for options pricing"}), 400
-                
-            use_real_world = request.args.get('real_world', 'false').lower() == 'true'
-            cagr = float(request.args.get('cagr', 10)) / 100
-            mu = cagr if use_real_world else None
-            rate = None if use_real_world else r
+        # Use the valuation service to calculate intrinsic values
+        custom_weights = {
+            "dcf": fcf_weight,
+            "pe": eps_weight,
+            "ev_ebitda": ev_ebitda_weight if use_ev_ebitda else 0
+        }
+        
+        try:
+            # For simplicity, we'll use our own calculation functions instead of the valuation service
+            # In a production environment, you would use the valuation service directly
+            from examples.advanced_valuation_example import (
+                calculate_fcf_per_share_valuation,
+                calculate_ev_ebitda_valuation,
+                calculate_weighted_average_valuation,
+                calculate_entry_price
+            )
+            # Import the new Qualtrim-style EPS valuation function and sanity check
+            from qualtrim_backend_eps import calculate_eps_based_valuation, apply_sanity_check
             
-            app.logger.info(f"Options parameters: K={K}, use_real_world={use_real_world}, cagr={cagr}")
-            
-            # Calculate option prices and probabilities
-            call_price, put_price, prob_ST_above_K, _, _ = prc.char_function_fft(S0, K, T, rate, mu, q, sigma, use_real_world)
-            expected_price = prc.stock_price_algo(S0, T, rate, mu, q, use_real_world)
-            
-            # Calculate more accurate probabilities using Black-Scholes formula
-            # For a call option, N(d2) gives the risk-neutral probability that the option expires in-the-money
-            import math
-            from scipy.stats import norm
-            
-            # Calculate d1 and d2 from Black-Scholes
-            if sigma > 0 and T > 0:
-                d1 = (math.log(S0/K) + (r - q + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
-                d2 = d1 - sigma * math.sqrt(T)
-                
-                # Probability that stock price > strike at maturity (for call option)
-                prob_above_strike = norm.cdf(d2)
-                
-                # Probability that stock price < strike at maturity (for put option)
-                prob_below_strike = 1 - prob_above_strike
-            else:
-                # Default probabilities if we can't calculate
-                prob_above_strike = 0.5
-                prob_below_strike = 0.5
-            
-            response_data.update({
-                "call_price": call_price,
-                "put_price": put_price,
-                "probability_above_strike": prob_above_strike,  # For call options
-                "probability_below_strike": prob_below_strike,  # For put options
-                "expected_price": expected_price,
-                "strike_price": K
-            })
-        else:
-            # Stock valuation
+            # Calculate valuations
             try:
-                app.logger.info(f"Starting stock valuation for {symbol}")
-                
-                # Check if we have a cached FCF value
-                if symbol not in fcf_cache:
-                    app.logger.info(f"No cached FCF for {symbol}, fetching default")
-                    # Get a default FCF value
-                    stock = yf.Ticker(symbol)
-                    cashflow = stock.cashflow
-                    if "Free Cash Flow" in cashflow.index:
-                        fcf_cache[symbol] = cashflow.loc["Free Cash Flow"].iloc[0]
-                        app.logger.info(f"Using annual FCF: {fcf_cache[symbol]}")
-                    else:
-                        # If no FCF data available, use a placeholder
-                        fcf_cache[symbol] = 0
-                        app.logger.warning(f"No FCF data available for {symbol}, using 0")
-                else:
-                    app.logger.info(f"Using cached FCF for {symbol}: {fcf_cache[symbol]}")
-                
-                # Override the get_manual_fcf function behavior
-                def get_cached_fcf(symbol):
-                    return fcf_cache.get(symbol, 0)
-                
-                # Monkey patch the function temporarily
-                original_get_fcf = mkdata.get_manual_fcf
-                mkdata.get_manual_fcf = get_cached_fcf
-                
-                app.logger.info(f"Getting intrinsic value data for {symbol}")
-                # Get intrinsic value data
-                fcf, growth_rate, terminal_growth_rate, discount_rate, pe_ratio, earnings_growth = mkdata.get_intrinsic_value_data(symbol)
-                app.logger.info(f"Intrinsic value data: fcf={fcf}, growth_rate={growth_rate}, terminal_growth_rate={terminal_growth_rate}, discount_rate={discount_rate}, pe_ratio={pe_ratio}, earnings_growth={earnings_growth}")
-                
-                # Restore original function
-                mkdata.get_manual_fcf = original_get_fcf
-                
-                # Get shares outstanding and net debt
-                stock = yf.Ticker(symbol)
-                shares_outstanding = stock.info.get("sharesOutstanding", 0)
-                
-                # Calculate net debt (if available)
-                total_debt = stock.info.get("totalDebt", 0) or 0
-                cash_and_equivalents = stock.info.get("totalCash", 0) or 0
-                net_debt = total_debt - cash_and_equivalents
-                
-                app.logger.info(f"Company data: shares_outstanding={shares_outstanding}, total_debt={total_debt}, cash_and_equivalents={cash_and_equivalents}, net_debt={net_debt}")
-                
-                # Calculate intrinsic value using DCF
-                app.logger.info(f"Calculating DCF with fcf={fcf}, growth_rate={growth_rate}, discount_rate={discount_rate}, terminal_growth={terminal_growth_rate}, net_debt={net_debt}, shares_outstanding={shares_outstanding}")
-                
-                dcf_result = prc.discounted_cash_flow(
-                    fcf, 
-                    growth_rate, 
-                    discount_rate, 
-                    terminal_growth=terminal_growth_rate,
-                    net_debt=net_debt,
-                    shares_outstanding=shares_outstanding
+                fcf_valuation = calculate_fcf_per_share_valuation(
+                    fcf_per_share=fcf_per_share,
+                    growth_rate=fcf_growth,
+                    years=years,
+                    fcf_yield=fcf_yield,
+                    discount_rate=desired_return
                 )
-                
-                app.logger.info(f"DCF result: {dcf_result}")
-                
-                # Extract the per share value from the DCF result
-                intrinsic_value_per_share = dcf_result['per_share_value']
-                
-                app.logger.info(f"Intrinsic value per share: {intrinsic_value_per_share}")
-                
-                # Calculate PEG ratio
-                try:
-                    peg_ratio = prc.peg_ratio(pe_ratio, earnings_growth) if earnings_growth > 0 else None
-                    app.logger.info(f"PEG ratio calculated: {peg_ratio}")
-                except Exception as e:
-                    app.logger.error(f"Error calculating PEG ratio: {str(e)}")
-                    peg_ratio = None
-                
-                # Calculate expected price
-                expected_price = prc.stock_price_algo(S0, T, r, None, q, False)
-                app.logger.info(f"Expected price calculated: {expected_price}")
-                
-                response_data.update({
-                    "intrinsic_value_per_share": intrinsic_value_per_share,
-                    "fcf": fcf / 1e9,  # Convert to billions for display
-                    "growth_rate": growth_rate,
-                    "terminal_growth_rate": terminal_growth_rate,
-                    "discount_rate": discount_rate,
-                    "pe_ratio": pe_ratio,
-                    "earnings_growth": earnings_growth,
-                    "peg_ratio": peg_ratio,
-                    "expected_price": expected_price
-                })
-                
-                app.logger.info(f"Stock valuation completed successfully for {symbol}")
-                
+                logger.info(f"FCF valuation keys: {list(fcf_valuation.keys())}")
             except Exception as e:
-                app.logger.error(f"Error in stock valuation: {str(e)}")
-                app.logger.error(traceback.format_exc())
-                return jsonify({"error": f"Stock valuation error: {str(e)}"}), 500
-
-        return jsonify(response_data)
+                logger.error(f"Error in FCF valuation: {str(e)}")
+                fcf_valuation = {"intrinsic_value": 0, "estimated_value": 0}
+            
+            try:
+                eps_valuation = calculate_eps_based_valuation(
+                    eps=eps,
+                    growth_rate=eps_growth,
+                    years=years,
+                    terminal_pe=eps_multiple,  # Use eps_multiple instead of terminal_pe
+                    discount_rate=desired_return,
+                    current_price=current_price
+                )
+                logger.info(f"EPS valuation using eps_multiple: {eps_multiple}")
+                logger.info(f"EPS valuation keys: {list(eps_valuation.keys())}")
+            except Exception as e:
+                logger.error(f"Error in EPS valuation: {str(e)}")
+                eps_valuation = {"intrinsic_value": 0, "estimated_value": 0}
+            
+            ev_ebitda_valuation = None
+            if use_ev_ebitda:
+                try:
+                    ev_ebitda_valuation = calculate_ev_ebitda_valuation(
+                        ebitda=ebitda,
+                        growth_rate=ebitda_growth,
+                        years=years,
+                        discount_rate=desired_return,
+                        net_debt=net_debt,
+                        shares_outstanding=shares_outstanding
+                    )
+                    logger.info(f"EV/EBITDA valuation keys: {list(ev_ebitda_valuation.keys())}")
+                except Exception as e:
+                    logger.error(f"Error in EV/EBITDA valuation: {str(e)}")
+                    ev_ebitda_valuation = {"intrinsic_value": 0, "estimated_value": 0}
+            
+            # Calculate weighted average
+            valuations = []
+            weights = []
+            
+            valuations.append(fcf_valuation['intrinsic_value'])
+            weights.append(fcf_weight)
+            
+            valuations.append(eps_valuation['intrinsic_value'])
+            weights.append(eps_weight)
+            
+            if use_ev_ebitda and ev_ebitda_valuation:
+                valuations.append(ev_ebitda_valuation['intrinsic_value'])
+                weights.append(ev_ebitda_weight)
+            
+            # Call the weighted average function with the correct parameters
+            try:
+                weighted_valuation = calculate_weighted_average_valuation(
+                    fcf_valuation=fcf_valuation,
+                    eps_valuation=eps_valuation,
+                    ev_ebitda_valuation=ev_ebitda_valuation if use_ev_ebitda else None,
+                    fcf_weight=fcf_weight,
+                    eps_weight=eps_weight,
+                    ev_ebitda_weight=ev_ebitda_weight
+                )
+                logger.info(f"Weighted valuation keys: {list(weighted_valuation.keys())}")
+            except Exception as e:
+                logger.error(f"Error in weighted valuation: {str(e)}")
+                # Create a basic weighted valuation result
+                weighted_value = sum(v * w for v, w in zip(valuations, weights)) / sum(weights)
+                weighted_valuation = {
+                    "intrinsic_value": weighted_value,
+                    "estimated_value": weighted_value,
+                    "weighted_value": weighted_value
+                }
+            
+            # Apply sanity checks
+            try:
+                fcf_valuation = apply_sanity_check(fcf_valuation, current_price)
+            except Exception as e:
+                logger.error(f"Error in FCF sanity check: {str(e)}")
+                
+            try:
+                eps_valuation = apply_sanity_check(eps_valuation, current_price)
+            except Exception as e:
+                logger.error(f"Error in EPS sanity check: {str(e)}")
+                
+            if use_ev_ebitda and ev_ebitda_valuation:
+                try:
+                    ev_ebitda_valuation = apply_sanity_check(ev_ebitda_valuation, current_price)
+                except Exception as e:
+                    logger.error(f"Error in EV/EBITDA sanity check: {str(e)}")
+                    
+            try:
+                weighted_valuation = apply_sanity_check(weighted_valuation, current_price)
+            except Exception as e:
+                logger.error(f"Error in weighted valuation sanity check: {str(e)}")
+                
+            # Calculate entry prices
+            try:
+                fcf_entry = calculate_entry_price(current_price, fcf_valuation['intrinsic_value'], desired_return, years)
+                fcf_valuation['entry_price'] = fcf_entry['entry_price_for_target']
+                fcf_valuation['implied_return'] = fcf_entry['implied_return'] * 100
+            except Exception as e:
+                logger.error(f"Error calculating FCF entry price: {str(e)}")
+                fcf_valuation['entry_price'] = 0
+                fcf_valuation['implied_return'] = 0
+            
+            try:
+                eps_entry = calculate_entry_price(current_price, eps_valuation['intrinsic_value'], desired_return, years)
+                # For EPS valuation, we want to use the intrinsic value directly as the entry price
+                # This matches Qualtrim's approach
+                eps_valuation['entry_price'] = eps_valuation['intrinsic_value']
+                eps_valuation['implied_return'] = eps_entry['implied_return'] * 100
+                logger.info(f"EPS entry price: ${eps_valuation['entry_price']:.2f}, implied return: {eps_valuation['implied_return']:.2f}%")
+            except Exception as e:
+                logger.error(f"Error calculating EPS entry price: {str(e)}")
+                eps_valuation['entry_price'] = 0
+                eps_valuation['implied_return'] = 0
+            
+            if use_ev_ebitda and ev_ebitda_valuation:
+                try:
+                    ev_ebitda_entry = calculate_entry_price(current_price, ev_ebitda_valuation['intrinsic_value'], desired_return, years)
+                    ev_ebitda_valuation['entry_price'] = ev_ebitda_entry['entry_price_for_target']
+                    ev_ebitda_valuation['implied_return'] = ev_ebitda_entry['implied_return'] * 100
+                except Exception as e:
+                    logger.error(f"Error calculating EV/EBITDA entry price: {str(e)}")
+                    ev_ebitda_valuation['entry_price'] = 0
+                    ev_ebitda_valuation['implied_return'] = 0
+            
+            try:
+                weighted_entry = calculate_entry_price(current_price, weighted_valuation['intrinsic_value'], desired_return, years)
+                weighted_valuation['entry_price'] = weighted_entry['entry_price_for_target']
+                weighted_valuation['implied_return'] = weighted_entry['implied_return'] * 100
+            except Exception as e:
+                logger.error(f"Error calculating weighted entry price: {str(e)}")
+                weighted_valuation['entry_price'] = 0
+                weighted_valuation['implied_return'] = 0
+            
+            # Prepare valuation results for response
+            valuation_results = {
+                "fcf_valuation": fcf_valuation,
+                "eps_valuation": eps_valuation,
+                "weighted_valuation": weighted_valuation
+            }
+            
+            if use_ev_ebitda and ev_ebitda_valuation:
+                valuation_results["ev_ebitda_valuation"] = ev_ebitda_valuation
+            
+        except Exception as e:
+            logger.error(f"Error calculating valuation: {str(e)}")
+            return jsonify({"error": f"Error calculating valuation: {str(e)}"}), 500
+        
+        # Generate projections
+        current_year = datetime.now().year
+        
+        # FCF projections
+        fcf_projections = []
+        fcf_projections.append({
+            "year": current_year,
+            "value": fcf_per_share,
+            "growth": 0
+        })
+        
+        for i in range(1, years + 1):
+            projected_fcf = fcf_per_share * (1 + fcf_growth) ** i
+            fcf_projections.append({
+                "year": current_year + i,
+                "value": projected_fcf,
+                "growth": fcf_growth * 100  # Convert back to percentage
+            })
+        
+        # EPS projections
+        eps_projections = []
+        eps_projections.append({
+            "year": current_year,
+            "value": eps,
+            "growth": 0
+        })
+        
+        for i in range(1, years + 1):
+            projected_eps = eps * (1 + eps_growth) ** i
+            eps_projections.append({
+                "year": current_year + i,
+                "value": projected_eps,
+                "growth": eps_growth * 100  # Convert back to percentage
+            })
+        
+        # EBITDA projections
+        ebitda_projections = []
+        ebitda_projections.append({
+            "year": current_year,
+            "value": ebitda / shares_outstanding,
+            "growth": 0
+        })
+        
+        for i in range(1, years + 1):
+            projected_ebitda = (ebitda / shares_outstanding) * (1 + ebitda_growth) ** i
+            ebitda_projections.append({
+                "year": current_year + i,
+                "value": projected_ebitda,
+                "growth": ebitda_growth * 100  # Convert back to percentage
+            })
+        
+        # Generate quarterly projections
+        quarterly_projections = []
+        current_quarter = (datetime.now().month - 1) // 3 + 1
+        
+        for i in range(8):  # Next 8 quarters
+            quarter_offset = (current_quarter + i - 1) % 4 + 1
+            year_offset = (current_quarter + i - 1) // 4
+            quarter_year = current_year + year_offset
+            quarter_label = f"{quarter_year}-Q{quarter_offset}"
+            
+            # Calculate quarterly values (simplified as annual / 4 with growth)
+            quarter_fcf = fcf_per_share * (1 + fcf_growth) ** (year_offset + (i / 4)) / 4
+            quarter_eps = eps * (1 + eps_growth) ** (year_offset + (i / 4)) / 4
+            quarter_ebitda = ebitda * (1 + ebitda_growth) ** (year_offset + (i / 4)) / 4
+            
+            quarterly_projections.append({
+                "quarter": quarter_label,
+                "fcf_per_share": quarter_fcf,
+                "eps": quarter_eps,
+                "ebitda": quarter_ebitda
+            })
+        
+        # Calculate 2-year targets
+        two_year_fcf_target = fcf_per_share * (1 + fcf_growth) ** 2
+        two_year_eps_target = eps * (1 + eps_growth) ** 2
+        
+        two_year_fcf_price = two_year_fcf_target / fcf_yield
+        two_year_eps_price = two_year_eps_target * eps_multiple  # Use the new EPS multiple instead of terminal_pe
+        
+        two_year_weighted_price = (two_year_fcf_price * fcf_weight + 
+                                  two_year_eps_price * eps_weight) / (fcf_weight + eps_weight)
+        
+        two_year_fcf_entry = calculate_entry_price(current_price, two_year_fcf_price, desired_return * 2, 2)
+        two_year_eps_entry = calculate_entry_price(current_price, two_year_eps_price, desired_return * 2, 2)
+        two_year_weighted_entry = calculate_entry_price(current_price, two_year_weighted_price, desired_return * 2, 2)
+        
+        two_year_targets = {
+            "fcf": {
+                "target_price": two_year_fcf_price,
+                "entry_price": two_year_fcf_entry['entry_price_for_target'],
+                "implied_return": two_year_fcf_entry['implied_return'] * 100 / 2  # Annualized
+            },
+            "eps": {
+                "target_price": two_year_eps_price,
+                "entry_price": two_year_eps_entry['entry_price_for_target'],
+                "implied_return": two_year_eps_entry['implied_return'] * 100 / 2  # Annualized
+            },
+            "weighted": {
+                "target_price": two_year_weighted_price,
+                "entry_price": two_year_weighted_entry['entry_price_for_target'],
+                "implied_return": two_year_weighted_entry['implied_return'] * 100 / 2  # Annualized
+            }
+        }
+        
+        # Prepare projections for response
+        projections_response = {
+            "fcf_projections": fcf_projections,
+            "eps_projections": eps_projections,
+            "ebitda_projections": ebitda_projections,
+            "quarterly_projections": quarterly_projections,
+            "two_year_targets": two_year_targets
+        }
+        
+        # Generate sensitivity analysis if requested
+        sensitivity_analysis = None
+        if include_sensitivity:
+            # FCF Growth sensitivity
+            fcf_growth_sensitivity = {}
+            for growth in range(int(fcf_growth * 100) - 10, int(fcf_growth * 100) + 15, 5):
+                if growth < 0:
+                    continue
+                    
+                fcf_growth_sensitivity[str(growth)] = {}
+                for yield_val in range(int(fcf_yield * 100) - 2, int(fcf_yield * 100) + 3):
+                    if yield_val <= 0:
+                        continue
+                        
+                    val = calculate_fcf_per_share_valuation(
+                        fcf_per_share=fcf_per_share,
+                        growth_rate=growth / 100,
+                        years=years,
+                        fcf_yield=yield_val / 100,
+                        discount_rate=desired_return
+                    )
+                    fcf_growth_sensitivity[str(growth)][str(yield_val)] = val['intrinsic_value']
+            
+            # EPS Growth sensitivity
+            eps_growth_sensitivity = {}
+            for growth in range(int(eps_growth * 100) - 10, int(eps_growth * 100) + 15, 5):
+                if growth < 0:
+                    continue
+                    
+                eps_growth_sensitivity[str(growth)] = {}
+                for pe in range(int(eps_multiple) - 5, int(eps_multiple) + 6, 2):  # Use eps_multiple instead of terminal_pe
+                    if pe <= 0:
+                        continue
+                        
+                    val = calculate_eps_based_valuation(
+                        eps=eps,
+                        growth_rate=growth / 100,
+                        years=years,
+                        terminal_pe=pe,
+                        discount_rate=desired_return
+                    )
+                    eps_growth_sensitivity[str(growth)][str(pe)] = val['intrinsic_value']
+            
+            # FCF Yield sensitivity
+            fcf_yield_sensitivity = {}
+            for yield_val in range(int(fcf_yield * 100) - 2, int(fcf_yield * 100) + 3):
+                if yield_val <= 0:
+                    continue
+                    
+                fcf_yield_sensitivity[str(yield_val)] = {}
+                for growth in range(int(fcf_growth * 100) - 10, int(fcf_growth * 100) + 15, 5):
+                    if growth < 0:
+                        continue
+                        
+                    val = calculate_fcf_per_share_valuation(
+                        fcf_per_share=fcf_per_share,
+                        growth_rate=growth / 100,
+                        years=years,
+                        fcf_yield=yield_val / 100,
+                        discount_rate=desired_return
+                    )
+                    fcf_yield_sensitivity[str(yield_val)][str(growth)] = val['intrinsic_value']
+            
+            # Terminal P/E sensitivity
+            terminal_pe_sensitivity = {}
+            for pe in range(int(eps_multiple) - 5, int(eps_multiple) + 6, 2):  # Use eps_multiple instead of terminal_pe
+                if pe <= 0:
+                    continue
+                    
+                terminal_pe_sensitivity[str(pe)] = {}
+                for growth in range(int(eps_growth * 100) - 10, int(eps_growth * 100) + 15, 5):
+                    if growth < 0:
+                        continue
+                        
+                    val = calculate_eps_based_valuation(
+                        eps=eps,
+                        growth_rate=growth / 100,
+                        years=years,
+                        terminal_pe=pe,
+                        discount_rate=desired_return
+                    )
+                    terminal_pe_sensitivity[str(pe)][str(growth)] = val['intrinsic_value']
+            
+            # Discount Rate sensitivity (for EV/EBITDA)
+            discount_rate_sensitivity = {}
+            if use_ev_ebitda:
+                for rate in range(int(desired_return * 100) - 5, int(desired_return * 100) + 6, 2):
+                    if rate <= 0:
+                        continue
+                        
+                    discount_rate_sensitivity[str(rate)] = {}
+                    for growth in range(int(ebitda_growth * 100) - 10, int(ebitda_growth * 100) + 15, 5):
+                        if growth < 0:
+                            continue
+                            
+                        val = calculate_ev_ebitda_valuation(
+                            ebitda=ebitda,
+                            growth_rate=growth / 100,
+                            years=years,
+                            discount_rate=rate / 100,
+                            net_debt=net_debt,
+                            shares_outstanding=shares_outstanding
+                        )
+                        discount_rate_sensitivity[str(rate)][str(growth)] = val['intrinsic_value']
+            
+            sensitivity_analysis = {
+                "fcf_growth": fcf_growth_sensitivity,
+                "eps_growth": eps_growth_sensitivity,
+                "fcf_yield": fcf_yield_sensitivity,
+                "terminal_pe": terminal_pe_sensitivity
+            }
+            
+            if use_ev_ebitda:
+                sensitivity_analysis["discount_rate"] = discount_rate_sensitivity
+        
+        # Prepare final response
+        response = {
+            "market_data": market_data_response,
+            "valuation_results": valuation_results,
+            "projections": projections_response
+        }
+        
+        if include_sensitivity:
+            response["sensitivity_analysis"] = sensitivity_analysis
+        
+        logger.info(f"Completed valuation for {symbol}")
+        return jsonify(response)
+    
     except Exception as e:
-        app.logger.error(f"Error in pricing: {str(e)}")
-        app.logger.error(traceback.format_exc())
+        logger.error(f"Error performing valuation: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000) 

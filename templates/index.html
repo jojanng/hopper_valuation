@@ -3,128 +3,487 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Analysis & Valuation</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Hopper - Stock Valuation Analysis Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <header>
+    <!-- Header with Logo -->
+    <header class="site-header">
         <div class="container">
-            <div class="logo">
-                <i class="fas fa-chart-line"></i>
-                <span>StockValuator</span>
+            <div class="row align-items-center py-3">
+                <div class="col-auto">
+                    <div class="logo-container">
+                        <img src="{{ url_for('static', filename='images/bun.png') }}" alt="Logo" class="logo">
+                    </div>
+                </div>
+                <div class="col">
+                    <h1 class="site-title mb-0"> Hopper - Stock Valuation Analysis Tool</h1>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary features-menu-btn">
+                        <i class="fas fa-bars"></i> Features
+                    </button>
+                </div>
             </div>
         </div>
     </header>
 
-    <div class="container">
-        <div class="card">
-            <h1>Stock Analysis & Valuation</h1>
-            <p>Enter a stock symbol to analyze its market parameters and calculate its intrinsic value.</p>
-            
-            <div class="input-group">
-                <label for="symbol">Stock Symbol:</label>
-                <input type="text" id="symbol" placeholder="e.g., AAPL, MSFT, GOOGL" autocomplete="off">
-            </div>
-            
-            <button id="fetch-data-btn" class="btn btn-primary">
-                <i class="fas fa-search"></i> Get Stock Data
-            </button>
-            
-            <div id="error-message" class="error-message"></div>
-            
-            <div id="loading" class="loading">
-                <div class="loading-spinner"></div>
-                <p>Loading data...</p>
-            </div>
-        </div>
-        
-        <div id="stock-result" class="card result-section">
-            <h2>Market Parameters</h2>
-            <div id="stock-data-grid" class="data-grid"></div>
-            
-            <h2>Choose Analysis Model</h2>
-            <div class="btn-group">
-                <button class="btn model-btn" data-model="options" disabled>
-                    <i class="fas fa-exchange-alt"></i> Options Pricing
-                </button>
-                <button class="btn model-btn" data-model="stocks" disabled>
-                    <i class="fas fa-chart-bar"></i> Stock Valuation
+    <!-- Features Menu -->
+    <div class="features-menu">
+        <div class="features-menu-inner">
+            <div class="features-menu-header">
+                <h2>Features</h2>
+                <button class="close-menu-btn">
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
-        </div>
-        
-        <div id="pricing-section" class="card result-section" style="display: none;">
-            <h2 id="pricing-title">Pricing Analysis</h2>
-            
-            <div id="strike-group" class="input-group" style="display: none;">
-                <label for="strike">Strike Price ($):</label>
-                <input type="number" id="strike" step="0.01" min="0">
-            </div>
-            
-            <div id="fcf-group" class="input-group" style="display: none;">
-                <label for="fcf-input">Free Cash Flow (Billions $):</label>
-                <div class="input-with-button">
-                    <input type="number" id="fcf-input" step="0.01" min="0" placeholder="e.g., 108.8">
-                    <button id="fcf-update-btn" class="btn btn-small">
-                        <i class="fas fa-check"></i> Update
-                    </button>
+            <div class="features-list">
+                <div class="feature-item">
+                    <i class="fas fa-chart-line"></i>
+                    <h3>EPS Valuation</h3>
+                    <p>Advanced earnings-based valuation with growth projections</p>
                 </div>
-                <small class="input-help">Enter the TTM Free Cash Flow in billions (as shown on Yahoo Finance)</small>
-            </div>
-            
-            <div class="input-group">
-                <label for="maturity">Time to Maturity (years):</label>
-                <input type="number" id="maturity" value="1" min="0.1" step="0.1">
-            </div>
-            
-            <button id="calculate-btn" class="btn">
-                <i class="fas fa-calculator"></i> Calculate
-            </button>
-        </div>
-        
-        <!-- Pricing Results Section -->
-        <div id="pricing-result" class="card result-section" style="display: none;">
-            <h2>Valuation Results</h2>
-            <div id="pricing-data-grid" class="data-grid"></div>
-            
-            <div id="valuation-summary" style="display: none;"></div>
-            
-            <div id="valuation-chart" class="chart-container" style="display: none;">
-                <canvas id="chart"></canvas>
-            </div>
-            
-            <div class="tabs">
-                <div class="tab active" data-target="tab-valuation">Valuation</div>
-                <div class="tab" data-target="tab-methodology">Methodology</div>
-            </div>
-            
-            <div id="tab-valuation" class="tab-content active">
-                <h3>About Our Valuation Model</h3>
-                <p>Our stock valuation model combines multiple approaches to provide a comprehensive assessment:</p>
-                <ul>
-                    <li><strong class="tooltip" data-term="intrinsic-value">Discounted Cash Flow (DCF)</strong> - Calculates the present value of expected future cash flows.</li>
-                    <li><strong class="tooltip" data-term="pe-ratio">Price-to-Earnings (P/E) Ratio</strong> - Compares the stock's price to its earnings per share.</li>
-                    <li><strong class="tooltip" data-term="peg-ratio">PEG Ratio</strong> - Factors in the company's growth rate to provide context for the P/E ratio.</li>
-                </ul>
-            </div>
-            
-            <div id="tab-methodology" class="tab-content">
-                <h3>Methodology</h3>
-                <p>Our valuation methodology incorporates:</p>
-                <ul>
-                    <li><strong>Free Cash Flow Analysis</strong> - We analyze the company's ability to generate cash after accounting for capital expenditures.</li>
-                    <li><strong>Growth Rate Estimation</strong> - We use analyst forecasts and historical data to project future growth.</li>
-                    <li><strong>Risk-Adjusted Discount Rate</strong> - We apply a discount rate that reflects the company's risk profile and the time value of money.</li>
-                    <li><strong>Terminal Value Calculation</strong> - We estimate the company's value beyond our explicit forecast period.</li>
-                </ul>
-                <p>For options pricing, we use the Fast Fourier Transform (FFT) method to efficiently calculate option prices under various market conditions.</p>
+                <div class="feature-item">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <h3>FCF Analysis</h3>
+                    <p>Free cash flow analysis with custom growth rates</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-calculator"></i>
+                    <h3>Entry Price Calculator</h3>
+                    <p>Calculate optimal entry prices for desired returns</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <h3>Multiple Valuation Methods</h3>
+                    <p>Combine EPS, FCF, and EV/EBITDA approaches</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-table"></i>
+                    <h3>Sensitivity Analysis</h3>
+                    <p>Interactive tables showing valuation sensitivity</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-project-diagram"></i>
+                    <h3>Price Projections</h3>
+                    <p>Visual future price and metrics projections</p>
+                </div>
             </div>
         </div>
     </div>
-    
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <div class="row">
+            <!-- Input Form -->
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h3>Valuation Parameters</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="valuation-form">
+                            <div class="mb-3">
+                                <label for="symbol" class="form-label">Stock Symbol</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="symbol" name="symbol" value="AAPL" required>
+                                    <button type="button" class="btn btn-outline-secondary" id="symbol-search">
+                                        <i class="bi bi-search"></i> Search
+                                    </button>
+                                </div>
+                                <div class="form-text">Enter a valid stock symbol (e.g., AAPL, MSFT) and press Search or Enter</div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="fcf-growth" class="form-label">FCF Growth Rate (%)</label>
+                                    <input type="number" class="form-control" id="fcf-growth" name="fcf_growth" value="15" min="0" max="100" step="0.1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="eps-growth" class="form-label">EPS Growth Rate (%)</label>
+                                    <input type="number" class="form-control" id="eps-growth" name="eps_growth" value="20" min="0" max="100" step="0.1">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="ebitda-growth" class="form-label">EBITDA Growth Rate (%)</label>
+                                    <input type="number" class="form-control" id="ebitda-growth" name="ebitda_growth" value="18" min="0" max="100" step="0.1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="fcf-yield" class="form-label">FCF Yield (%)</label>
+                                    <input type="number" class="form-control" id="fcf-yield" name="fcf_yield" value="4" min="0.1" max="20" step="0.1">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="terminal-pe" class="form-label">Terminal P/E Ratio</label>
+                                    <input type="number" class="form-control" id="terminal-pe" name="terminal_pe" value="15" min="1" max="100" step="0.1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="desired-return" class="form-label">Desired Return (%)</label>
+                                    <input type="number" class="form-control" id="desired-return" name="desired_return" value="15" min="1" max="50" step="0.1">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="eps-multiple" class="form-label">EPS Multiple (P/E)</label>
+                                    <input type="number" class="form-control" id="eps-multiple" name="eps_multiple" value="20" min="1" max="100" step="0.1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="projection-years" class="form-label">Projection Years</label>
+                                    <select class="form-select" id="projection-years" name="projection_years">
+                                        <option value="2">2 Years</option>
+                                        <option value="5" selected>5 Years</option>
+                                        <option value="10">10 Years</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="years" class="form-label">Calculation Years</label>
+                                    <input type="number" class="form-control" id="years" name="years" value="5" min="1" max="20" step="1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="sbc-impact" class="form-label">SBC Impact (%)</label>
+                                    <input type="number" class="form-control" id="sbc-impact" name="sbc_impact" value="0" min="0" max="100" step="0.1">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="fcf-weight" class="form-label">FCF Weight (%)</label>
+                                    <input type="number" class="form-control" id="fcf-weight" name="fcf_weight" value="50" min="0" max="100" step="1">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="eps-weight" class="form-label">EPS Weight (%)</label>
+                                    <input type="number" class="form-control" id="eps-weight" name="eps_weight" value="30" min="0" max="100" step="1">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="ev-ebitda-weight" class="form-label">EV/EBITDA Weight (%)</label>
+                                    <input type="number" class="form-control" id="ev-ebitda-weight" name="ev_ebitda_weight" value="20" min="0" max="100" step="1">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-2 text-end">
+                                <span>Total Weight: <span id="weight-total" class="fw-bold">100%</span></span>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="use-ev-ebitda" name="use_ev_ebitda" checked>
+                                <label class="form-check-label" for="use-ev-ebitda">Include EV/EBITDA Valuation</label>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="sensitivity" name="sensitivity">
+                                <label class="form-check-label" for="sensitivity">Include Sensitivity Analysis</label>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100">Calculate Valuation</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="col-md-8">
+                <div id="loading" class="text-center d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Calculating valuation...</p>
+                </div>
+
+                <div id="results-container" class="d-none">
+                    <!-- Market Data Card -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h3 id="market-data-title">AAPL - Market Data</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <th>Current Price:</th>
+                                            <td id="current-price"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Shares Outstanding:</th>
+                                            <td id="shares-outstanding"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Free Cash Flow (TTM):</th>
+                                            <td id="fcf"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Net Income (TTM):</th>
+                                            <td id="net-income"></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <th>EBITDA (TTM):</th>
+                                            <td id="ebitda"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>FCF/Share (TTM):</th>
+                                            <td id="fcf-per-share"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>EPS (TTM):</th>
+                                            <td id="eps"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>P/E (TTM):</th>
+                                            <td id="pe-ratio"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Net Debt:</th>
+                                            <td id="net-debt"></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Valuation Summary Card -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h3>Valuation Summary</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h5 class="mb-0">Calculation Results</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <strong>Return from today's price:</strong>
+                                                <span id="return-from-today" class="fw-bold"></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <strong>Entry Price for <span id="desired-return-display">15</span>% Return:</strong>
+                                                <span id="entry-price-display" class="fw-bold"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div id="price-chart-container" style="height: 150px;">
+                                        <canvas id="price-projection-chart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <table class="table table-bordered" id="valuation-summary">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Valuation Method</th>
+                                                <th>Intrinsic Value</th>
+                                                <th>Entry Price (<span id="table-desired-return">15</span>% Return)</th>
+                                                <th>Implied Return</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Filled by JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Projections Card -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning">
+                            <h3>Projections</h3>
+                        </div>
+                        <div class="card-body">
+                            <ul class="nav nav-tabs" id="projectionTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="five-year-tab" data-bs-toggle="tab" data-bs-target="#five-year" type="button" role="tab" aria-controls="five-year" aria-selected="true">5-Year Projections</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="two-year-tab" data-bs-toggle="tab" data-bs-target="#two-year" type="button" role="tab" aria-controls="two-year" aria-selected="false">2-Year Projections</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="quarterly-tab" data-bs-toggle="tab" data-bs-target="#quarterly" type="button" role="tab" aria-controls="quarterly" aria-selected="false">Quarterly Projections</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="graphs-tab" data-bs-toggle="tab" data-bs-target="#graphs" type="button" role="tab" aria-controls="graphs" aria-selected="false">Projection Graphs</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content p-3" id="projectionTabsContent">
+                                <div class="tab-pane fade show active" id="five-year" role="tabpanel" aria-labelledby="five-year-tab">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <h5>FCF/Share Projections</h5>
+                                            <table class="table table-sm" id="fcf-projections">
+                                                <!-- Filled by JavaScript -->
+                                            </table>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h5>EPS Projections</h5>
+                                            <table class="table table-sm" id="eps-projections">
+                                                <!-- Filled by JavaScript -->
+                                            </table>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h5>EBITDA Projections</h5>
+                                            <table class="table table-sm" id="ebitda-projections">
+                                                <!-- Filled by JavaScript -->
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="graphs" role="tabpanel" aria-labelledby="graphs-tab">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-4">
+                                            <h5>FCF/Share Projection Graph</h5>
+                                            <canvas id="fcf-projection-chart" width="400" height="300"></canvas>
+                                        </div>
+                                        <div class="col-md-6 mb-4">
+                                            <h5>EPS Projection Graph</h5>
+                                            <canvas id="eps-projection-chart" width="400" height="300"></canvas>
+                                        </div>
+                                        <div class="col-md-6 mb-4">
+                                            <h5>EBITDA Projection Graph</h5>
+                                            <canvas id="ebitda-projection-chart" width="400" height="300"></canvas>
+                                        </div>
+                                        <div class="col-md-6 mb-4">
+                                            <h5>Combined Projections</h5>
+                                            <canvas id="combined-projection-chart" width="400" height="300"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="two-year" role="tabpanel" aria-labelledby="two-year-tab">
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <table class="table table-bordered">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Valuation Method</th>
+                                                        <th>2-Year Target</th>
+                                                        <th>Entry Price (15% Return)</th>
+                                                        <th>Implied Return</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td>FCF-Based</td>
+                                                        <td id="fcf-2yr-value"></td>
+                                                        <td id="fcf-2yr-entry"></td>
+                                                        <td id="fcf-2yr-implied"></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>EPS-Based</td>
+                                                        <td id="eps-2yr-value"></td>
+                                                        <td id="eps-2yr-entry"></td>
+                                                        <td id="eps-2yr-implied"></td>
+                                                    </tr>
+                                                    <tr class="table-primary">
+                                                        <td><strong>Weighted Average</strong></td>
+                                                        <td id="weighted-2yr-value"></td>
+                                                        <td id="weighted-2yr-entry"></td>
+                                                        <td id="weighted-2yr-implied"></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="quarterly" role="tabpanel" aria-labelledby="quarterly-tab">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered" id="quarterly-projections">
+                                            <!-- Filled by JavaScript -->
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sensitivity Analysis Card -->
+                    <div class="card mb-4" id="sensitivity-card">
+                        <div class="card-header bg-secondary text-white">
+                            <h3>Sensitivity Analysis</h3>
+                        </div>
+                        <div class="card-body">
+                            <ul class="nav nav-tabs" id="sensitivityTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="fcf-growth-tab" data-bs-toggle="tab" data-bs-target="#fcf-growth-sensitivity" type="button" role="tab" aria-controls="fcf-growth-sensitivity" aria-selected="true">FCF Growth</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="eps-growth-tab" data-bs-toggle="tab" data-bs-target="#eps-growth-sensitivity" type="button" role="tab" aria-controls="eps-growth-sensitivity" aria-selected="false">EPS Growth</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="fcf-yield-tab" data-bs-toggle="tab" data-bs-target="#fcf-yield-sensitivity" type="button" role="tab" aria-controls="fcf-yield-sensitivity" aria-selected="false">FCF Yield</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="terminal-pe-tab" data-bs-toggle="tab" data-bs-target="#terminal-pe-sensitivity" type="button" role="tab" aria-controls="terminal-pe-sensitivity" aria-selected="false">Terminal P/E</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="discount-rate-tab" data-bs-toggle="tab" data-bs-target="#discount-rate-sensitivity" type="button" role="tab" aria-controls="discount-rate-sensitivity" aria-selected="false">Discount Rate</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content p-3" id="sensitivityTabsContent">
+                                <div class="tab-pane fade show active" id="fcf-growth-sensitivity" role="tabpanel" aria-labelledby="fcf-growth-tab">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered" id="fcf-growth-table">
+                                            <!-- Filled by JavaScript -->
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="eps-growth-sensitivity" role="tabpanel" aria-labelledby="eps-growth-tab">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered" id="eps-growth-table">
+                                            <!-- Filled by JavaScript -->
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="fcf-yield-sensitivity" role="tabpanel" aria-labelledby="fcf-yield-tab">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered" id="fcf-yield-table">
+                                            <!-- Filled by JavaScript -->
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="terminal-pe-sensitivity" role="tabpanel" aria-labelledby="terminal-pe-tab">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered" id="terminal-pe-table">
+                                            <!-- Filled by JavaScript -->
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="discount-rate-sensitivity" role="tabpanel" aria-labelledby="discount-rate-tab">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered" id="discount-rate-table">
+                                            <!-- Filled by JavaScript -->
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
