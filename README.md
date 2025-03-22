@@ -1,8 +1,32 @@
 # Hopper Backend
 
-A robust financial analysis and valuation API with advanced features.
+This is a python project for financial analysis and valuation of stocks. 
 
-## Project Structure
+## Disclaimer
+I am not a licensed financial advisor, and the information provided is for general informational and educational purposes only. It should not be construed as financial, investment, or legal advice. Always do your own research and consult with a certified financial advisor before making any investment decisions. I am not responsible for any losses you may incur.
+
+
+## Simple Template Project Structure
+
+```
+hopper_valuation/
+├── frontend/                 # Flask frontend
+│   ├── app.py
+│   ├── templates/
+│   ├── static/
+│   └── requirements.txt
+│
+├── backend/                  # FastAPI backend
+│   ├── main.py
+│   ├── api/
+│   ├── services/
+│   └── requirements.txt
+│
+└── docker-compose.yml       # To run both services
+
+```
+
+## Complexe Template Project Structure
 
 ```
 hopper_backend/
@@ -69,14 +93,14 @@ hopper_backend/
 │
 └── docker/                 # Containerization
     ├── Dockerfile
-    └── docker-compose.yml
+    └── docker-compose.yml  # To run
 ```
 
 ## Features
 
 - **Market Data Service**: Multi-provider support with fallback strategy
 - **Valuation Engine**: Multiple valuation models with customizable weights
-- **Analytics Engine**: FFT-based option pricing and market cycle detection
+- **Analytics Engine**: FFT-based option pricing and market cycle detection (Not implemented)
 - **API Layer**: RESTful endpoints with authentication and rate limiting
 - **Database Layer**: PostgreSQL, TimescaleDB, and Redis for caching
 
@@ -89,7 +113,30 @@ hopper_backend/
 - Redis
 - TimescaleDB (optional)
 
-### Installation
+### Installation (Flask) - Working
+
+1. Clone the repository
+2. Create and activate a virtual environment:
+   ```
+   python -m venv .venv
+   # On Windows:
+   .venv\Scripts\activate
+   # On Unix or MacOS:
+   source .venv/bin/activate
+   ```
+3. Install dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+4. Set up environment variables:
+   ```
+   cp .env.example .env
+   ```
+5. Run the application:
+   ```
+   python app.py
+   ```   
+### Installation (FastAPI) - Not completed
 
 1. Clone the repository
 2. Install dependencies:

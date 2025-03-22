@@ -4,5 +4,6 @@ Implement FFT analysis (FFT frameworks: Black-Scholes, Implied Volatility Curves
 
 Web animation
 
+Structured Flask front-end, FastAPI back-end and Docker
 
     
