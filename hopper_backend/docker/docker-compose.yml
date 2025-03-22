@@ -14,7 +14,7 @@ services:
       - redis
       - timescale
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/qualtrim
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hopper
       - REDIS_URL=redis://redis:6379/0
       - TIMESCALE_URL=postgresql://postgres:postgres@timescale:5432/timeseries
       - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
@@ -30,7 +30,7 @@ services:
     environment:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_USER=postgres
-      - POSTGRES_DB=qualtrim
+      - POSTGRES_DB=hopper
     ports:
       - "5432:5432"
     healthcheck:

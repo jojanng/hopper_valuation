@@ -1,5 +1,5 @@
 """
-Configuration module for the Qualtrim backend.
+Configuration module for the Hopper backend.
 
 This module loads configuration from environment variables with sensible defaults.
 """
@@ -14,7 +14,7 @@ class DatabaseSettings(BaseSettings):
     port: int = Field(default=5432, env="DB_PORT")
     username: str = Field(default="postgres", env="DB_USER")
     password: str = Field(default="postgres", env="DB_PASSWORD")
-    database: str = Field(default="qualtrim", env="DB_NAME")
+    database: str = Field(default="hopper", env="DB_NAME")
     
     @property
     def connection_string(self) -> str:
@@ -27,7 +27,7 @@ class TimescaleDBSettings(DatabaseSettings):
     port: int = Field(default=5432, env="TIMESCALE_PORT")
     username: str = Field(default="postgres", env="TIMESCALE_USER")
     password: str = Field(default="postgres", env="TIMESCALE_PASSWORD")
-    database: str = Field(default="qualtrim_timeseries", env="TIMESCALE_DB_NAME")
+    database: str = Field(default="hopper_timeseries", env="TIMESCALE_DB_NAME")
 
 class RedisSettings(BaseSettings):
     """Redis connection settings."""
@@ -69,7 +69,7 @@ class ValuationSettings(BaseSettings):
 
 class Settings(BaseSettings):
     """Main application settings."""
-    app_name: str = Field(default="Qualtrim Backend", env="APP_NAME")
+    app_name: str = Field(default="Hopper Backend", env="APP_NAME")
     environment: str = Field(default="development", env="ENVIRONMENT")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
     

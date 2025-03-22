@@ -8,9 +8,9 @@ import pytest
 import asyncio
 from unittest.mock import patch, MagicMock
 
-from qualtrim_backend.services.market_data.service import MarketDataService
-from qualtrim_backend.services.market_data.providers.yfinance_provider import YFinanceProvider
-from qualtrim_backend.services.market_data.providers.finnhub_provider import FinnhubProvider
+from hopper_backend.services.market_data.service import MarketDataService
+from hopper_backend.services.market_data.providers.yfinance_provider import YFinanceProvider
+from hopper_backend.services.market_data.providers.finnhub_provider import FinnhubProvider
 
 # Test data
 TEST_SYMBOL = "AAPL"
@@ -67,8 +67,8 @@ def mock_finnhub_provider():
 @pytest.fixture
 def market_data_service(mock_yfinance_provider, mock_finnhub_provider):
     """Create a MarketDataService with mock providers."""
-    with patch("qualtrim_backend.services.market_data.service.YFinanceProvider", return_value=mock_yfinance_provider), \
-         patch("qualtrim_backend.services.market_data.service.FinnhubProvider", return_value=mock_finnhub_provider):
+    with patch("hopper_backend.services.market_data.service.YFinanceProvider", return_value=mock_yfinance_provider), \
+         patch("hopper_backend.services.market_data.service.FinnhubProvider", return_value=mock_finnhub_provider):
         service = MarketDataService()
         # Manually set providers for testing
         service.providers = {

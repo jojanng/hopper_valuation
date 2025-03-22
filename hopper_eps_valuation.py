@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Qualtrim-style EPS-based Valuation
+EPS-based Valuation
 
-This module provides a simplified EPS-based valuation function that matches
-the calculation method used by Qualtrim.
+This module provides a simplified EPS-based valuation function that matches.
 """
 
 print("Script starting...")
 
-def calculate_qualtrim_eps_valuation(eps, growth_rate, years, eps_multiple, desired_return, current_price=None):
+def calculate_hopper_eps_valuation(eps, growth_rate, years, eps_multiple, desired_return, current_price=None):
     """
     Calculate the intrinsic value and entry price using a simplified EPS-based approach.
     
@@ -60,7 +59,7 @@ if __name__ == "__main__":
     print("Running example calculation...")
     
     # Example with Apple's data
-    result = calculate_qualtrim_eps_valuation(
+    result = calculate_hopper_eps_valuation(
         eps=6.24,           # Current EPS
         growth_rate=0.07,   # 7% annual growth
         years=5,            # 5-year projection

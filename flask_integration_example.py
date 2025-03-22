@@ -1,7 +1,7 @@
 """
 Flask Integration Example
 
-This script demonstrates how to integrate the new Qualtrim backend architecture
+This script demonstrates how to integrate the new Hopper backend architecture
 with your existing Flask application.
 """
 
@@ -10,9 +10,9 @@ import asyncio
 import logging
 
 # Import services from the new architecture
-from qualtrim_backend.services.market_data.service import MarketDataService
-from qualtrim_backend.services.valuation.service import ValuationService
-from qualtrim_backend.services.analytics.fft.service import FFTAnalysisService
+from hopper_backend.services.market_data.service import MarketDataService
+from hopper_backend.services.valuation.service import ValuationService
+from hopper_backend.services.analytics.fft.service import FFTAnalysisService
 
 # Configure logging
 logging.basicConfig(

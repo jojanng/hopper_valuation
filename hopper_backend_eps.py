@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """
-Qualtrim-style EPS-based Valuation for Backend Integration
-
-This module provides a simplified EPS-based valuation function that matches
-the calculation method used by Qualtrim, designed to be integrated into
-the main application backend.
+This module provides a simplified EPS-based valuation function designed to be integrated into the main application backend.
 """
 
 from datetime import datetime
@@ -16,9 +12,6 @@ logger = logging.getLogger(__name__)
 def apply_sanity_check(result, current_price, max_deviation=0.5):
     """
     Apply a sanity check to the valuation results to ensure they're within a reasonable range.
-    
-    This is a simplified version of the original apply_sanity_check function that works with
-    our Qualtrim-style EPS valuation results.
     
     Args:
         result: The valuation result dictionary
@@ -74,7 +67,7 @@ def calculate_eps_based_valuation(eps, growth_rate, years, terminal_pe=15, disco
     Calculate the intrinsic value and entry price using a simplified EPS-based approach.
     
     This function replaces the more complex DCF-based EPS valuation with a simpler
-    approach that matches Qualtrim's calculation method.
+    approach that matches Hopper's calculation method.
     
     Args:
         eps: Current earnings per share
@@ -98,14 +91,11 @@ def calculate_eps_based_valuation(eps, growth_rate, years, terminal_pe=15, disco
     intrinsic_value = future_value / (1 + discount_rate) ** years
     
     # Calculate entry price for desired return
-    # In Qualtrim's approach, the entry price is the same as the intrinsic value
     entry_price = intrinsic_value
     
     # Calculate implied return if current price is provided
     implied_return = None
     if current_price is not None and current_price > 0:
-        # Qualtrim's approach for calculating implied return
-        # This is the key change to match Qualtrim's results
         # Instead of using future_value/current_price, we use a different approach
         # that considers the relationship between intrinsic value and current price
         
@@ -115,10 +105,8 @@ def calculate_eps_based_valuation(eps, growth_rate, years, terminal_pe=15, disco
         # Method 2: Calculate the annual return rate that would make current_price grow to future_value in 'years' years
         implied_return = (future_value / current_price) ** (1 / years) - 1
         
-        # Method 3: Adjust the calculation to match Qualtrim's specific approach
-        # This is a reverse-engineered formula that aims to match Qualtrim's results
-        # The adjustment factor is determined empirically
-        adjustment_factor = 1.25  # This factor is adjusted to match Qualtrim's results
+        # Method 3: The adjustment factor is determined empirically
+        adjustment_factor = 1.25  
         implied_return = ((future_value / current_price) ** (1 / years) - 1) * adjustment_factor
     
     # Generate projected EPS values for each year

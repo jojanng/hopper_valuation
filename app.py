@@ -3,7 +3,7 @@
 Advanced Stock Valuation Web Application
 
 This Flask application provides a web interface to the advanced stock valuation
-functionality from the qualtrim_backend services and advanced_valuation_example.py.
+functionality from the hopper_backend services and advanced_valuation_example.py.
 It offers the same precision and accuracy as the command-line version.
 """
 
@@ -16,13 +16,13 @@ from datetime import datetime, timedelta
 import numpy as np
 from flask import Flask, request, jsonify, render_template, send_from_directory
 
-# Add the parent directory to the path so we can import the qualtrim_backend package
+# Add the parent directory to the path so we can import the hopper_backend package
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 
-# Import qualtrim_backend services
-from qualtrim_backend.services.market_data.service import MarketDataService
-from qualtrim_backend.services.valuation.service import ValuationService
-from qualtrim_backend.config.config import Settings
+# Import hopper_backend services
+from hopper_backend.services.market_data.service import MarketDataService
+from hopper_backend.services.valuation.service import ValuationService
+from hopper_backend.config.config import Settings
 
 # Configure logging
 logging.basicConfig(
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 
-# Initialize qualtrim_backend services
+# Initialize hopper_backend services
 settings = Settings()
 market_data_service = MarketDataService(config=settings)
 valuation_service = ValuationService(market_data_service, config={})
@@ -101,7 +101,7 @@ def perform_valuation():
         include_sensitivity = data.get('sensitivity', False)
         
         try:
-            # Fetch market data using the qualtrim_backend services
+            # Fetch market data using the hopper_backend services
             current_price = run_async(market_data_service.get_current_price(symbol))
             financial_data = run_async(market_data_service.get_financial_data(symbol))
             
@@ -164,8 +164,8 @@ def perform_valuation():
                 calculate_weighted_average_valuation,
                 calculate_entry_price
             )
-            # Import the new Qualtrim-style EPS valuation function and sanity check
-            from qualtrim_backend_eps import calculate_eps_based_valuation, apply_sanity_check
+            # Import the new hopper-style EPS valuation function and sanity check
+            from hopper_backend_eps import calculate_eps_based_valuation, apply_sanity_check
             
             # Calculate valuations
             try:
@@ -282,7 +282,7 @@ def perform_valuation():
             try:
                 eps_entry = calculate_entry_price(current_price, eps_valuation['intrinsic_value'], desired_return, years)
                 # For EPS valuation, we want to use the intrinsic value directly as the entry price
-                # This matches Qualtrim's approach
+                # This matches Hopper's approach
                 eps_valuation['entry_price'] = eps_valuation['intrinsic_value']
                 eps_valuation['implied_return'] = eps_entry['implied_return'] * 100
                 logger.info(f"EPS entry price: ${eps_valuation['entry_price']:.2f}, implied return: {eps_valuation['implied_return']:.2f}%")

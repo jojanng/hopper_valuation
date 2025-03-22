@@ -11,11 +11,10 @@ import os
 import sys
 from pprint import pprint
 
-# Add the parent directory to the path so we can import the qualtrim_backend package
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from qualtrim_backend.services.market_data.service import MarketDataService
-from qualtrim_backend.config.config import Settings
+from hopper_backend.services.market_data.service import MarketDataService
+from hopper_backend.config.config import Settings
 
 # Configure logging
 logging.basicConfig(
