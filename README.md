@@ -1,5 +1,3 @@
-# Hopper Backend
-
 This is a python project for financial analysis and valuation of stocks. 
 
 
@@ -162,6 +160,7 @@ docker-compose up -d
 API documentation is available at `/docs` when the server is running.
 
 ## Disclaimer
+
 I am not a licensed financial advisor, and the information provided is for general informational and educational purposes only. It should not be construed as financial, investment, or legal advice. Always do your own research and consult with a certified financial advisor before making any investment decisions. I am not responsible for any losses you may incur.
 
 ## License
