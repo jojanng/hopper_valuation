@@ -230,4 +230,39 @@ class YFinanceProvider:
             }
         
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, _get_financial_data) 
+        return await loop.run_in_executor(None, _get_financial_data)
+    
+    async def get_available_symbols(self) -> List[str]:
+        """
+        Get a list of available symbols from Yahoo Finance.
+        This includes stocks, ETFs, and other financial instruments.
+        
+        Returns:
+            List[str]: List of available symbols
+        """
+        def _get_symbols():
+            # Get popular ETFs and stocks
+            etfs = ['SPY', 'VOO', 'QQQ', 'VTI', 'BND', 'VEA', 'VWO', 'AGG']
+            stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'PLTR', 'ASML', 
+                     'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'UNH', 'HD', 'BAC', 'INTC', 'VZ', 'ADBE', 
+                     'NFLX', 'CSCO', 'PFE', 'CRM', 'ABT', 'KO', 'PEP', 'NKE', 'T', 'MRK', 'DIS']
+            
+            # Combine and sort
+            symbols = sorted(list(set(etfs + stocks)))
+            
+            # Verify each symbol is valid
+            valid_symbols = []
+            for symbol in symbols:
+                try:
+                    ticker = yf.Ticker(symbol)
+                    info = ticker.info
+                    if info and 'regularMarketPrice' in info and info['regularMarketPrice'] is not None:
+                        valid_symbols.append(symbol)
+                except Exception as e:
+                    logger.debug(f"Symbol {symbol} not available: {str(e)}")
+            
+            return valid_symbols
+        
+        # Run in a separate thread to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _get_symbols) 

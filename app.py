@@ -63,13 +63,17 @@ def serve_static(path):
 def get_symbols():
     """Get available stock symbols."""
     try:
-        # Return a list of common stock symbols
-        # In a production environment, this would be fetched from a database or API
-        symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'PLTR', 'ASML', 'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'UNH', 'HD', 'BAC', 'INTC', 'VZ', 'ADBE', 'NFLX', 'CSCO', 'PFE', 'CRM', 'ABT', 'KO', 'PEP', 'NKE', 'T', 'MRK', 'DIS']
+        # Get symbols dynamically from the market data service
+        symbols = run_async(market_data_service.get_available_symbols())
         return jsonify({"symbols": symbols})
     except Exception as e:
         logger.error(f"Error fetching symbols: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        # Return a basic list as fallback
+        return jsonify({
+            "symbols": ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'PLTR', 'ASML', 
+                       'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'UNH', 'HD', 'BAC', 'INTC', 'VZ', 'ADBE', 
+                       'NFLX', 'CSCO', 'PFE', 'CRM', 'ABT', 'KO', 'PEP', 'NKE', 'T', 'MRK', 'DIS', 'VOO']
+        })
 
 @app.route('/api/valuation', methods=['POST'])
 def perform_valuation():
@@ -114,25 +118,33 @@ def perform_valuation():
             cash_and_equivalents = financial_data.get('cashAndEquivalents', 0)
             net_debt = total_debt - cash_and_equivalents
             
-            # Calculate per share metrics
-            fcf_per_share = fcf / shares_outstanding if shares_outstanding > 0 else 0
-            eps = net_income / shares_outstanding if shares_outstanding > 0 else 0
+            # Calculate per share metrics with safety checks
+            if shares_outstanding <= 0:
+                logger.warning(f"Invalid shares outstanding ({shares_outstanding}) for {symbol}")
+                shares_outstanding = 1  # Use 1 as a fallback to avoid division by zero
+
+            fcf_per_share = fcf / shares_outstanding
+            eps = net_income / shares_outstanding
             
-            # Calculate P/E ratio
-            pe_ratio = current_price / eps if eps > 0 else 0
+            # Calculate P/E ratio with safety check
+            pe_ratio = 0
+            if eps > 0:
+                pe_ratio = current_price / eps
+            else:
+                logger.warning(f"Invalid EPS ({eps}) for {symbol}, P/E ratio set to 0")
             
             # Apply SBC impact if provided
             if sbc_impact > 0:
                 fcf = fcf * (1 - sbc_impact)
                 net_income = net_income * (1 - sbc_impact)
                 ebitda = ebitda * (1 - sbc_impact)
-                fcf_per_share = fcf / shares_outstanding if shares_outstanding > 0 else 0
-                eps = net_income / shares_outstanding if shares_outstanding > 0 else 0
+                fcf_per_share = fcf / shares_outstanding
+                eps = net_income / shares_outstanding
             
         except Exception as e:
             logger.error(f"Error fetching data for {symbol}: {str(e)}")
             return jsonify({
-                "error": f"Symbol '{symbol}' not found or error fetching data. Please use one of the available symbols from the symbol selector."
+                "error": f"Symbol '{symbol}' not found or error fetching data."
             }), 404
         
         # Prepare market data for response

@@ -93,7 +93,7 @@ hopper_backend/
 
 ## Features
 
-- **Market Data Service**: Multi-provider support with fallback strategy
+- **Market Data Service**: Multi-provider support with fallback strategy (Doesn't support ETF )
 - **Valuation Engine**: Multiple valuation models with customizable weights
 - **Analytics Engine**: FFT-based option pricing and market cycle detection (Not implemented)
 - **API Layer**: RESTful endpoints with authentication and rate limiting

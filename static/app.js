@@ -252,15 +252,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update error message
         errorAlert.innerHTML = `
-            ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            ${message}
         `;
         
-        // Show the error alert
+        // Show error alert
         errorAlert.classList.remove('d-none');
         
-        // Scroll to error
-        errorAlert.scrollIntoView({ behavior: 'smooth' });
+        // Hide results container
+        resultsContainer.classList.add('d-none');
     }
     
     // Form submission handler
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Show user-friendly error message
             if (error.message.includes("not found")) {
-                showErrorMessage(`${error.message} Available symbols include: AAPL, MSFT, GOOGL, AMZN, META, TSLA, NVDA, AMD, PLTR, ASML, JPM, V, JNJ, etc.`);
+                showErrorMessage(`${error.message}`);
             } else {
                 showErrorMessage('Error calculating valuation: ' + error.message);
             }

@@ -239,4 +239,22 @@ class MarketDataService:
             return fcf if fcf is not None else 0.0
         except Exception as e:
             logger.warning(f"Error getting free cash flow for {symbol}: {str(e)}")
-            return 0.0 
+            return 0.0
+    
+    async def get_available_symbols(self) -> List[str]:
+        """
+        Get a list of available symbols from the market data providers.
+        
+        Returns:
+            List[str]: List of available symbols
+        """
+        try:
+            # Try to get symbols from the default provider
+            symbols = await self.providers[self.default_provider].get_available_symbols()
+            return symbols
+        except Exception as e:
+            logger.error(f"Error getting symbols from {self.default_provider}: {str(e)}")
+            # Return a basic list of common symbols as fallback
+            return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'PLTR', 'ASML', 
+                   'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'UNH', 'HD', 'BAC', 'INTC', 'VZ', 'ADBE', 
+                   'NFLX', 'CSCO', 'PFE', 'CRM', 'ABT', 'KO', 'PEP', 'NKE', 'T', 'MRK', 'DIS', 'VOO'] 
