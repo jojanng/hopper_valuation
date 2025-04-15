@@ -265,4 +265,247 @@ class YFinanceProvider:
         
         # Run in a separate thread to avoid blocking event loop
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, _get_symbols) 
+        return await loop.run_in_executor(None, _get_symbols)
+    
+    async def get_historical_fcf(self, symbol: str, years: int = 5) -> List[float]:
+        """
+        Get historical free cash flow data from Yahoo Finance.
+        
+        Args:
+            symbol: Stock symbol
+            years: Number of years of historical data to fetch
+            
+        Returns:
+            List[float]: List of historical FCF values (oldest to newest)
+        """
+        def _get_historical_fcf():
+            try:
+                ticker = yf.Ticker(symbol)
+                
+                # Get cash flow statements for the past years
+                cash_flow = ticker.cashflow
+                
+                if cash_flow.empty:
+                    return []
+                
+                # Cash flow statements are typically annual
+                # We need to calculate FCF = Operating Cash Flow - Capital Expenditures
+                if 'Total Cash From Operating Activities' in cash_flow.index and 'Capital Expenditures' in cash_flow.index:
+                    operating_cash_flow = cash_flow.loc['Total Cash From Operating Activities']
+                    capital_expenditures = cash_flow.loc['Capital Expenditures']
+                    
+                    # Calculate FCF for each period
+                    fcf_values = operating_cash_flow + capital_expenditures  # CapEx is typically negative
+                    
+                    # Convert to list (most recent first) and limit to requested years
+                    fcf_list = fcf_values.to_list()[:years]
+                    
+                    # Reverse to get oldest first
+                    return fcf_list[::-1]
+                else:
+                    # If the required rows are not found, try alternative names
+                    # This handles different naming conventions in the data
+                    ocf_candidates = ['Total Cash From Operating Activities', 'Operating Cash Flow']
+                    capex_candidates = ['Capital Expenditures', 'CapEx']
+                    
+                    for ocf_name in ocf_candidates:
+                        if ocf_name in cash_flow.index:
+                            operating_cash_flow = cash_flow.loc[ocf_name]
+                            break
+                    else:
+                        return []  # OCF not found
+                        
+                    for capex_name in capex_candidates:
+                        if capex_name in cash_flow.index:
+                            capital_expenditures = cash_flow.loc[capex_name]
+                            break
+                    else:
+                        return []  # CapEx not found
+                    
+                    # Calculate FCF
+                    fcf_values = operating_cash_flow + capital_expenditures
+                    
+                    # Convert to list and limit to requested years
+                    fcf_list = fcf_values.to_list()[:years]
+                    
+                    # Reverse to get oldest first
+                    return fcf_list[::-1]
+            except Exception as e:
+                logger.error(f"Error fetching historical FCF for {symbol}: {str(e)}")
+                return []
+        
+        # Run in a separate thread to avoid blocking
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _get_historical_fcf)
+    
+    async def get_risk_free_rate(self) -> float:
+        """
+        Get the current risk-free rate (10-year Treasury yield) from Yahoo Finance.
+        
+        Returns:
+            float: Current risk-free rate as a decimal
+        """
+        def _get_risk_free_rate():
+            try:
+                # Get the 10-year Treasury yield (^TNX)
+                treasury = yf.Ticker("^TNX")
+                
+                # Get the current yield (convert from percentage to decimal)
+                data = treasury.history(period="1d")
+                
+                if not data.empty:
+                    # Get the latest close price (yield)
+                    yield_value = data['Close'].iloc[-1] / 100.0  # Convert from percentage
+                    return yield_value
+                else:
+                    # Default value if data not available
+                    return 0.035  # 3.5% as default
+                    
+            except Exception as e:
+                logger.error(f"Error fetching risk-free rate: {str(e)}")
+                return 0.035  # 3.5% as default
+        
+        # Run in a separate thread to avoid blocking
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _get_risk_free_rate)
+    
+    async def get_industry_growth_rate(self, symbol: str) -> float:
+        """
+        Get the average growth rate for the industry the company belongs to.
+        
+        Args:
+            symbol: Stock symbol
+            
+        Returns:
+            float: Industry growth rate as a decimal
+        """
+        def _get_industry_growth_rate():
+            try:
+                ticker = yf.Ticker(symbol)
+                
+                # Get the industry and sector information
+                info = ticker.info
+                
+                if 'industry' not in info or 'sector' not in info:
+                    return 0.03  # Default if industry info not available
+                
+                industry = info['industry']
+                sector = info['sector']
+                
+                # Get some benchmark tickers for this industry/sector
+                benchmark_symbols = []
+                
+                # Technology companies
+                if sector == 'Technology':
+                    if 'Software' in industry:
+                        benchmark_symbols = ['MSFT', 'ADBE', 'CRM', 'ORCL', 'INTU']
+                    elif 'Hardware' in industry or 'Semiconductor' in industry:
+                        benchmark_symbols = ['NVDA', 'AMD', 'INTC', 'TSM', 'AVGO']
+                    else:
+                        benchmark_symbols = ['AAPL', 'MSFT', 'GOOGL', 'META', 'NVDA']
+                
+                # Financial companies
+                elif sector == 'Financial Services':
+                    if 'Bank' in industry:
+                        benchmark_symbols = ['JPM', 'BAC', 'WFC', 'C', 'GS']
+                    else:
+                        benchmark_symbols = ['JPM', 'V', 'MA', 'BLK', 'MS']
+                
+                # Healthcare companies
+                elif sector == 'Healthcare':
+                    benchmark_symbols = ['JNJ', 'PFE', 'MRK', 'ABBV', 'UNH']
+                
+                # Consumer companies
+                elif 'Consumer' in sector:
+                    benchmark_symbols = ['AMZN', 'WMT', 'PG', 'KO', 'PEP']
+                
+                # Add more sectors as needed
+                else:
+                    # Default to S&P 500 components
+                    benchmark_symbols = ['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META']
+                
+                # Calculate the average analyst growth estimates for the benchmarks
+                growth_rates = []
+                
+                for bench_symbol in benchmark_symbols:
+                    if bench_symbol == symbol:
+                        continue  # Skip the original symbol
+                        
+                    try:
+                        bench_ticker = yf.Ticker(bench_symbol)
+                        bench_info = bench_ticker.info
+                        
+                        # Try to get growth estimates
+                        if 'earningsGrowth' in bench_info and bench_info['earningsGrowth'] is not None:
+                            growth_rates.append(bench_info['earningsGrowth'])
+                        elif 'revenueGrowth' in bench_info and bench_info['revenueGrowth'] is not None:
+                            growth_rates.append(bench_info['revenueGrowth'])
+                    except Exception:
+                        continue  # Skip if error
+                
+                # Calculate the average growth rate
+                if growth_rates:
+                    avg_growth = sum(growth_rates) / len(growth_rates)
+                    # Apply reasonable bounds (0% to 30%)
+                    avg_growth = max(min(avg_growth, 0.30), 0.0)
+                    return avg_growth
+                else:
+                    # Default if no growth rates are found
+                    return 0.03  # 3% as default
+                    
+            except Exception as e:
+                logger.error(f"Error calculating industry growth rate for {symbol}: {str(e)}")
+                return 0.03  # 3% as default
+        
+        # Run in a separate thread to avoid blocking
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _get_industry_growth_rate)
+    
+    async def get_historical_metrics(self, symbol: str) -> Dict[str, Dict]:
+        """
+        Get historical financial metrics from Yahoo Finance.
+        
+        Args:
+            symbol: Stock symbol
+            
+        Returns:
+            Dict[str, Dict]: Historical metrics with dates as keys
+        """
+        def _get_historical_metrics():
+            ticker = yf.Ticker(symbol)
+            
+            # Get quarterly financials
+            income_stmt = ticker.quarterly_financials
+            balance_sheet = ticker.quarterly_balance_sheet
+            
+            if income_stmt.empty or balance_sheet.empty:
+                raise ValueError(f"No historical financial data found for {symbol}")
+            
+            # Create result dictionary
+            result = {}
+            
+            # Process each date
+            all_dates = sorted(set(income_stmt.columns) | set(balance_sheet.columns))
+            for date in all_dates:
+                date_str = date.strftime('%Y-%m-%d')
+                
+                # Get metrics for this date
+                net_income = float(income_stmt.loc['Net Income', date]) if 'Net Income' in income_stmt.index and date in income_stmt.columns else None
+                ebitda = float(income_stmt.loc['EBITDA', date]) if 'EBITDA' in income_stmt.index and date in income_stmt.columns else None
+                total_debt = float(balance_sheet.loc['Total Debt', date]) if 'Total Debt' in balance_sheet.index and date in balance_sheet.columns else None
+                cash = float(balance_sheet.loc['Cash', date]) if 'Cash' in balance_sheet.index and date in balance_sheet.columns else None
+                shares = float(balance_sheet.loc['Share Issued', date]) if 'Share Issued' in balance_sheet.index and date in balance_sheet.columns else None
+                
+                result[date_str] = {
+                    'netIncome': net_income,
+                    'ebitda': ebitda,
+                    'totalDebt': total_debt,
+                    'cashAndEquivalents': cash,
+                    'sharesOutstanding': shares
+                }
+            
+            return result
+        
+        # Run in a separate thread to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _get_historical_metrics) 

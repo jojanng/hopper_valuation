@@ -8,6 +8,7 @@ from functools import lru_cache
 from .models.dcf import DiscountedCashFlowModel
 from .models.pe import PEBasedModel
 from .models.ev_ebitda import EVEBITDAModel
+from .models.historical_valuation import HistoricalValuationModel
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,14 @@ class ValuationService:
         self.dcf_model = DiscountedCashFlowModel()
         self.pe_model = PEBasedModel()
         self.ev_ebitda_model = EVEBITDAModel()
+        self.historical_model = HistoricalValuationModel()
         
         # Default weights for valuation methods
         self.weights = self.config.get("valuation_weights", {
-            "dcf": 0.5,
-            "pe": 0.3,
-            "ev_ebitda": 0.2
+            "dcf": 0.3,
+            "pe": 0.2,
+            "ev_ebitda": 0.2,
+            "historical": 0.3
         })
     
     async def calculate_intrinsic_value(
@@ -101,14 +104,30 @@ class ValuationService:
             revenue_growth = financial_data.get('revenueGrowth', 0.02)
             terminal_growth = max(min(revenue_growth if revenue_growth and revenue_growth > 0 else 0.02, 0.03), 0.01)
             
-            # Calculate DCF valuation
+            # Get additional data for enhanced DCF model
+            historical_fcf = await self.market_data_service.get_historical_fcf(symbol)
+            risk_free_rate = await self.market_data_service.get_risk_free_rate()
+            industry_growth = await self.market_data_service.get_industry_growth_rate(symbol)
+            debt_to_equity = await self.market_data_service.get_debt_to_equity(symbol)
+            cost_of_debt = await self.market_data_service.get_cost_of_debt(symbol)
+            beta = financial_data.get('beta', 1.0)
+            
+            # Calculate DCF valuation with enhanced model
             dcf_result = await self.dcf_model.calculate(
                 fcf=fcf,
                 growth_rate=dcf_growth,
-                discount_rate=0.10,  # Could be dynamic based on risk
+                discount_rate=0.10,  # Starting point, will be adjusted by model
                 terminal_growth=terminal_growth,
                 net_debt=net_debt,
-                shares_outstanding=financial_data.get('sharesOutstanding', 1)
+                shares_outstanding=financial_data.get('sharesOutstanding', 1),
+                # Additional parameters for enhanced model
+                historical_fcf=historical_fcf,
+                analyst_growth_estimate=earnings_growth,
+                industry_growth=industry_growth,
+                beta=beta,
+                risk_free_rate=risk_free_rate,
+                debt_to_equity=debt_to_equity,
+                cost_of_debt=cost_of_debt
             )
             
             # Calculate P/E based valuation
@@ -165,8 +184,13 @@ class ValuationService:
                         'equity_value': dcf_result['equity_value'],
                         'growth_rate': dcf_growth,
                         'terminal_growth': terminal_growth,
-                        'discount_rate': 0.10,
-                        'weight': weights['dcf'] if dcf_result['per_share_value'] > 0 else 0
+                        'discount_rate': dcf_result.get('wacc', 0.10),
+                        'weight': weights['dcf'] if dcf_result['per_share_value'] > 0 else 0,
+                        'projected_growth_rates': dcf_result.get('projected_growth_rates', []),
+                        'historical_fcf': historical_fcf,
+                        'industry_growth': industry_growth,
+                        'beta': beta,
+                        'risk_free_rate': risk_free_rate
                     },
                     'pe': {
                         'target_pe': pe_result['target_pe'],
@@ -188,7 +212,9 @@ class ValuationService:
                         'fcf': fcf,
                         'ebitda': financial_data.get('ebitda', 0),
                         'net_income': financial_data.get('netIncome', 0),
-                        'pe_ratio': financial_data.get('peRatio', None)
+                        'pe_ratio': financial_data.get('peRatio', None),
+                        'debt_to_equity': debt_to_equity,
+                        'cost_of_debt': cost_of_debt
                     }
                 }
             }
@@ -375,4 +401,77 @@ class ValuationService:
             return sensitivity_result
         except Exception as e:
             logger.error(f"Error calculating sensitivity analysis for {symbol}: {str(e)}")
-            raise ValueError(f"Error calculating sensitivity analysis for {symbol}: {str(e)}") 
+            raise ValueError(f"Error calculating sensitivity analysis for {symbol}: {str(e)}")
+
+    async def calculate(self, fcf, growth_rate, discount_rate, years=10, terminal_growth=0.02, net_debt=0, shares_outstanding=1):
+        # Add growth rate validation
+        if growth_rate > 0.40:  # Cap at 40%
+            logger.warning(f"Growth rate {growth_rate*100}% too high, capping at 40%")
+            growth_rate = 0.40
+        
+        # Adjust terminal growth based on company size
+        if fcf > 10_000_000_000:  # $10B FCF
+            terminal_growth = min(terminal_growth, 0.02)  # Large companies grow slower
+        
+        # Adjust discount rate based on size and growth
+        size_premium = 0.02 if fcf < 1_000_000_000 else 0
+        growth_risk = 0.01 if growth_rate > 0.25 else 0
+        adjusted_discount_rate = discount_rate + size_premium + growth_risk
+
+    async def calculate(self, eps, growth_rate, industry_pe=None, peg_ratio=1.0):
+        # Adjust PEG ratio based on growth rate
+        if growth_rate > 0.25:
+            peg_ratio = 0.8  # Higher growth needs more conservative PEG
+        elif growth_rate < 0.10:
+            peg_ratio = 1.2  # Lower growth can support higher PEG
+        
+        # Use industry PE more heavily
+        if industry_pe:
+            target_pe = (target_pe * 0.5) + (industry_pe * 0.5)  # Equal weight 
+
+    async def calculate(self, ebitda, growth_rate, net_debt, shares_outstanding):
+        # Use different multiple based on growth and stability
+        base_multiple = 8.0  # Starting point
+        growth_premium = min(growth_rate * 10, 4.0)  # Growth premium
+        size_discount = 0 if ebitda > 1_000_000_000 else -1.0  # Size discount
+        
+        target_multiple = base_multiple + growth_premium + size_discount 
+
+    async def calculate_scenarios(self, base_value):
+        return {
+            'best_case': base_value * 1.3,  # 30% upside
+            'base_case': base_value,
+            'worst_case': base_value * 0.7,  # 30% downside
+            'confidence': 'medium'  # Based on volatility and growth
+        }
+
+    async def calculate_historical_valuation(
+        self,
+        symbol: str,
+        years: int = 5,
+        discount_rate: float = 0.1,
+        terminal_growth: float = 0.02
+    ) -> Dict[str, Any]:
+        """
+        Calculate intrinsic value using historical data.
+        
+        Args:
+            symbol: Stock symbol
+            years: Number of years for historical analysis
+            discount_rate: Discount rate for DCF
+            terminal_growth: Terminal growth rate
+            
+        Returns:
+            Dict containing valuation results
+        """
+        try:
+            return await self.historical_model.calculate(
+                symbol,
+                self.market_data_service,
+                years,
+                discount_rate,
+                terminal_growth
+            )
+        except Exception as e:
+            logger.error(f"Error in historical valuation for {symbol}: {str(e)}")
+            raise 

@@ -257,4 +257,226 @@ class MarketDataService:
             # Return a basic list of common symbols as fallback
             return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'PLTR', 'ASML', 
                    'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'UNH', 'HD', 'BAC', 'INTC', 'VZ', 'ADBE', 
-                   'NFLX', 'CSCO', 'PFE', 'CRM', 'ABT', 'KO', 'PEP', 'NKE', 'T', 'MRK', 'DIS', 'VOO'] 
+                   'NFLX', 'CSCO', 'PFE', 'CRM', 'ABT', 'KO', 'PEP', 'NKE', 'T', 'MRK', 'DIS', 'VOO']
+    
+    async def get_historical_fcf(self, symbol: str, years: int = 5) -> List[float]:
+        """
+        Get historical free cash flow data for the last several years.
+        
+        Args:
+            symbol: Stock symbol
+            years: Number of years of historical data to fetch
+            
+        Returns:
+            List[float]: List of historical FCF values (oldest to newest)
+        """
+        try:
+            # Try to get data from provider
+            provider_name = self.default_provider
+            
+            if provider_name == "yfinance":
+                # YFinance doesn't have a direct method for historical FCF,
+                # so we calculate it from historical cash flow statements
+                return await self.providers[provider_name].get_historical_fcf(symbol, years)
+            else:
+                # Try other providers
+                for name, provider in self.providers.items():
+                    try:
+                        if hasattr(provider, 'get_historical_fcf'):
+                            return await provider.get_historical_fcf(symbol, years)
+                    except Exception as e:
+                        logger.warning(f"Error getting historical FCF from {name}: {str(e)}")
+            
+            # If we get here, no provider could provide the data
+            logger.warning(f"Could not get historical FCF for {symbol}. Will use regular growth estimate.")
+            return []
+            
+        except Exception as e:
+            logger.error(f"Error fetching historical FCF for {symbol}: {str(e)}")
+            return []
+    
+    async def get_risk_free_rate(self) -> float:
+        """
+        Get the current risk-free rate (10-year Treasury yield).
+        
+        Returns:
+            float: Current risk-free rate as a decimal (e.g., 0.035 for 3.5%)
+        """
+        try:
+            # Try to get data from provider
+            provider_name = self.default_provider
+            
+            if provider_name == "yfinance":
+                # For YFinance, use the 10-year Treasury yield (^TNX)
+                return await self.providers[provider_name].get_risk_free_rate()
+            else:
+                # Try other providers
+                for name, provider in self.providers.items():
+                    try:
+                        if hasattr(provider, 'get_risk_free_rate'):
+                            return await provider.get_risk_free_rate()
+                    except Exception as e:
+                        logger.warning(f"Error getting risk-free rate from {name}: {str(e)}")
+            
+            # If we get here, no provider could provide the data
+            # Return a reasonable default
+            logger.warning("Could not get risk-free rate. Using default of 3.5%.")
+            return 0.035
+            
+        except Exception as e:
+            logger.error(f"Error fetching risk-free rate: {str(e)}")
+            return 0.035
+    
+    async def get_industry_growth_rate(self, symbol: str) -> float:
+        """
+        Get the average growth rate for the industry the company belongs to.
+        
+        Args:
+            symbol: Stock symbol
+            
+        Returns:
+            float: Industry growth rate as a decimal
+        """
+        try:
+            # Try to get data from provider
+            provider_name = self.default_provider
+            
+            if provider_name == "yfinance":
+                # For YFinance, try to get industry peers and calculate average growth
+                return await self.providers[provider_name].get_industry_growth_rate(symbol)
+            else:
+                # Try other providers
+                for name, provider in self.providers.items():
+                    try:
+                        if hasattr(provider, 'get_industry_growth_rate'):
+                            return await provider.get_industry_growth_rate(symbol)
+                    except Exception as e:
+                        logger.warning(f"Error getting industry growth from {name}: {str(e)}")
+            
+            # If we get here, no provider could provide the data
+            # Return a reasonable default based on overall market
+            logger.warning(f"Could not get industry growth rate for {symbol}. Using default of 3%.")
+            return 0.03
+            
+        except Exception as e:
+            logger.error(f"Error fetching industry growth rate for {symbol}: {str(e)}")
+            return 0.03
+    
+    async def get_cost_of_debt(self, symbol: str) -> Optional[float]:
+        """
+        Calculate the company's cost of debt based on interest expenses and total debt.
+        
+        Args:
+            symbol: Stock symbol
+            
+        Returns:
+            float: Cost of debt as a decimal, or None if not available
+        """
+        try:
+            # Get financial data
+            financial_data = await self.get_financial_data(symbol)
+            
+            # Check if the required data is available
+            interest_expense = financial_data.get("interestExpense")
+            total_debt = financial_data.get("totalDebt")
+            
+            if interest_expense and total_debt and total_debt > 0:
+                # Calculate cost of debt = Interest Expense / Total Debt
+                cost_of_debt = abs(interest_expense) / total_debt
+                
+                # Apply reasonable bounds (1% to 15%)
+                cost_of_debt = max(min(cost_of_debt, 0.15), 0.01)
+                
+                return cost_of_debt
+            else:
+                # If data is missing, return None
+                logger.warning(f"Could not calculate cost of debt for {symbol} due to missing data.")
+                return None
+            
+        except Exception as e:
+            logger.error(f"Error calculating cost of debt for {symbol}: {str(e)}")
+            return None
+    
+    async def get_debt_to_equity(self, symbol: str) -> Optional[float]:
+        """
+        Get the company's debt-to-equity ratio.
+        
+        Args:
+            symbol: Stock symbol
+            
+        Returns:
+            float: Debt-to-equity ratio, or None if not available
+        """
+        try:
+            # Get financial data
+            financial_data = await self.get_financial_data(symbol)
+            
+            # Check if the required data is available
+            total_debt = financial_data.get("totalDebt")
+            total_equity = financial_data.get("totalStockholderEquity")
+            
+            if total_debt is not None and total_equity is not None and total_equity > 0:
+                # Calculate debt-to-equity ratio
+                debt_to_equity = total_debt / total_equity
+                
+                # Apply reasonable bounds (0 to 5)
+                debt_to_equity = max(min(debt_to_equity, 5.0), 0.0)
+                
+                return debt_to_equity
+            else:
+                # If data is missing, return None
+                logger.warning(f"Could not calculate debt-to-equity ratio for {symbol} due to missing data.")
+                return None
+            
+        except Exception as e:
+            logger.error(f"Error calculating debt-to-equity ratio for {symbol}: {str(e)}")
+            return None
+    
+    async def get_historical_metrics(self, symbol: str) -> Dict[str, Dict]:
+        """
+        Get historical financial metrics.
+        
+        Args:
+            symbol: Stock symbol
+            
+        Returns:
+            Dict[str, Dict]: Historical metrics with dates as keys
+        """
+        try:
+            # Try to get data from YFinance first
+            if "yfinance" in self.providers:
+                try:
+                    return await self.providers["yfinance"].get_historical_metrics(symbol)
+                except Exception as e:
+                    logger.warning(f"Error getting historical metrics from YFinance: {str(e)}")
+            
+            # Try Finnhub as fallback
+            if "finnhub" in self.providers:
+                try:
+                    return await self.providers["finnhub"].get_historical_metrics(symbol)
+                except Exception as e:
+                    logger.warning(f"Error getting historical metrics from Finnhub: {str(e)}")
+            
+            # If we get here, no provider could provide the data
+            logger.warning(f"Could not get historical metrics for {symbol}. Using current metrics.")
+            
+            # Get current financial data as fallback
+            financial_data = await self.get_financial_data(symbol)
+            historical_data = await self.get_historical_data(symbol, period="5y")
+            
+            # Create a dict with the same metrics for all dates
+            result = {}
+            for date in historical_data.keys():
+                result[date] = {
+                    'sharesOutstanding': financial_data.get('sharesOutstanding'),
+                    'netIncome': financial_data.get('netIncome'),
+                    'ebitda': financial_data.get('ebitda'),
+                    'totalDebt': financial_data.get('totalDebt'),
+                    'cashAndEquivalents': financial_data.get('cashAndEquivalents')
+                }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error fetching historical metrics for {symbol}: {str(e)}")
+            return {} 

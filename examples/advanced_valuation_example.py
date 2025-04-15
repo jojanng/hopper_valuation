@@ -31,123 +31,69 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def apply_sanity_check(result, current_price, max_deviation=0.5):
+def calculate_fcf_per_share_valuation(fcf_per_share, growth_rate, years, fcf_yield, discount_rate):
     """
-    Apply a sanity check to the valuation results to ensure they're within a reasonable range.
+    Calculate intrinsic value and growth path based on FCF/share.
     
     Args:
-        result: The valuation result dictionary
-        current_price: The current market price
-        max_deviation: Maximum allowed deviation from current price (as a percentage)
-        
-    Returns:
-        A modified result dictionary with reasonable values
-    """
-    # Make a copy of the result to avoid modifying the original
-    modified_result = result.copy()
-    
-    # Calculate the maximum and minimum reasonable values
-    max_value = current_price * (1 + max_deviation)
-    min_value = current_price * (1 - max_deviation)
-    
-    # Store original values for reporting
-    original_values = {}
-    
-    # Apply sanity check to the weighted value (intrinsic value)
-    if 'weighted_value' in modified_result:
-        original_values['weighted_value'] = modified_result['weighted_value']
-        if modified_result['weighted_value'] > max_value:
-            modified_result['weighted_value'] = max_value
-            logger.info(f"Adjusted weighted value from ${original_values['weighted_value']:.2f} to ${max_value:.2f}")
-        elif modified_result['weighted_value'] < min_value:
-            modified_result['weighted_value'] = min_value
-            logger.info(f"Adjusted weighted value from ${original_values['weighted_value']:.2f} to ${min_value:.2f}")
-    
-    # Apply sanity check to individual model values
-    for key in ['dcf_value', 'pe_value', 'ev_ebitda_value']:
-        if key in modified_result:
-            original_values[key] = modified_result[key]
-            if modified_result[key] > max_value:
-                modified_result[key] = max_value
-                logger.info(f"Adjusted {key} from ${original_values[key]:.2f} to ${max_value:.2f}")
-            elif modified_result[key] < min_value:
-                modified_result[key] = min_value
-                logger.info(f"Adjusted {key} from ${original_values[key]:.2f} to ${min_value:.2f}")
-    
-    # Recalculate upside potential based on adjusted weighted value
-    if 'weighted_value' in modified_result and 'current_price' in modified_result:
-        modified_result['upside_potential'] = (modified_result['weighted_value'] / modified_result['current_price'] - 1) * 100
-    
-    # Store the original values for reference
-    modified_result['original_values'] = original_values
-    
-    return modified_result
-
-def calculate_fcf_per_share_valuation(fcf_per_share, growth_rate, years, terminal_growth=0.025, discount_rate=0.1, fcf_yield=0.04):
-    """
-    Calculate intrinsic value based on FCF per share with growth projections.
-    
-    Args:
-        fcf_per_share: Current free cash flow per share
-        growth_rate: Expected annual growth rate for FCF
+        fcf_per_share: Free Cash Flow per share (current)
+        growth_rate: Expected growth rate (decimal)
         years: Number of years to project
-        terminal_growth: Long-term growth rate after projection period
-        discount_rate: Discount rate to apply
-        fcf_yield: Target FCF yield for valuation
+        fcf_yield: Expected FCF yield for terminal value
+        discount_rate: Discount rate / required return
         
     Returns:
-        Dictionary with valuation results
+        Dict: Valuation results
     """
-    # Project FCF per share for each year
-    projected_fcf = []
-    for year in range(1, years + 1):
-        projected_fcf.append(fcf_per_share * (1 + growth_rate) ** year)
+    # Ensure inputs are valid
+    if fcf_per_share <= 0:
+        return {
+            "intrinsic_value": 0,
+            "estimated_value": 0,
+            "growth_path": []
+        }
     
-    # Calculate terminal value using FCF yield method
-    terminal_fcf = projected_fcf[-1] * (1 + terminal_growth)
-    terminal_value = terminal_fcf / fcf_yield
-    
-    # Calculate present value of projected FCF and terminal value
-    pv_fcf = 0
-    for year, fcf in enumerate(projected_fcf, 1):
-        pv_fcf += fcf / (1 + discount_rate) ** year
-    
-    pv_terminal = terminal_value / (1 + discount_rate) ** years
-    
-    # Calculate intrinsic value
-    intrinsic_value = pv_fcf + pv_terminal
-    
-    # Create quarterly projections
-    quarterly_projections = []
-    current_date = datetime.now()
-    current_year = current_date.year
-    current_quarter = (current_date.month - 1) // 3 + 1
-    
-    for quarter in range(1, years * 4 + 1):
-        # Calculate the projected year and quarter
-        projected_quarter = current_quarter + quarter
-        projected_year = current_year + (projected_quarter - 1) // 4
-        projected_quarter = ((projected_quarter - 1) % 4) + 1
+    try:
+        # Calculate future FCF per share
+        future_fcf_per_share = fcf_per_share * (1 + growth_rate) ** years
         
-        # Calculate the growth and values
-        quarter_growth = (1 + growth_rate) ** (quarter / 4)
-        quarter_fcf = fcf_per_share * quarter_growth
-        quarter_value = quarter_fcf / fcf_yield
+        # Calculate terminal value based on FCF yield
+        terminal_value = future_fcf_per_share / fcf_yield
         
-        quarterly_projections.append({
-            'date': f"{projected_year}-Q{projected_quarter}",
-            'fcf_per_share': quarter_fcf,
-            'estimated_value': quarter_value
-        })
-    
-    return {
-        'intrinsic_value': intrinsic_value,
-        'projected_fcf': projected_fcf,
-        'terminal_value': terminal_value,
-        'pv_fcf': pv_fcf,
-        'pv_terminal': pv_terminal,
-        'quarterly_projections': quarterly_projections
-    }
+        # Calculate present value (intrinsic value)
+        intrinsic_value = terminal_value / (1 + discount_rate) ** years
+        
+        # Generate growth path for visualization
+        growth_path = []
+        for year in range(years + 1):
+            year_fcf = fcf_per_share * (1 + growth_rate) ** year
+            year_value = year_fcf / fcf_yield
+            growth_path.append({
+                "year": year,
+                "fcf_per_share": year_fcf,
+                "value": year_value
+            })
+        
+        # Return the results
+        return {
+            "intrinsic_value": intrinsic_value,
+            "estimated_value": intrinsic_value,  # For compatibility
+            "terminal_value": terminal_value,
+            "future_fcf_per_share": future_fcf_per_share,
+            "years": years,
+            "growth_rate": growth_rate,
+            "discount_rate": discount_rate,
+            "fcf_yield": fcf_yield,
+            "growth_path": growth_path
+        }
+    except Exception as e:
+        logger.error(f"Error in FCF/share valuation: {str(e)}")
+        return {
+            "intrinsic_value": 0,
+            "estimated_value": 0,
+            "growth_path": [],
+            "error": str(e)
+        }
 
 def calculate_eps_based_valuation(eps, growth_rate, years, terminal_pe=15, discount_rate=0.1):
     """
@@ -552,11 +498,11 @@ def print_fcf_valuation_summary(result, current_price, fcf_per_share, growth_rat
     print(f"Upside/Downside: {upside:.2f}%")
     
     print("\nProjected FCF/Share:")
-    for year, fcf in enumerate(result['projected_fcf'], 1):
-        print(f"  Year {year}: ${fcf:.2f}")
+    for year, fcf in enumerate(result['growth_path'], 1):
+        print(f"  Year {year}: ${fcf['value']:.2f}")
     
     print(f"\nTerminal Value: ${result['terminal_value']:.2f}")
-    print(f"Present Value of FCF: ${result['pv_fcf']:.2f}")
+    print(f"Present Value of FCF: ${result['pv_ebitda']:.2f}")
     print(f"Present Value of Terminal Value: ${result['pv_terminal']:.2f}")
     
     print("\nQuarterly Projections:")
@@ -790,6 +736,7 @@ async def main():
             fcf_per_share=fcf_per_share,
             growth_rate=fcf_growth_rate,
             years=years,
+            discount_rate=0.10,
             fcf_yield=fcf_yield
         )
         
@@ -922,9 +869,9 @@ async def main():
         short_term_years = 2
         
         # Use the 2-year projection from quarterly projections
-        fcf_2yr_value = fcf_result['quarterly_projections'][7]['estimated_value']  # 8th quarter (2 years)
-        eps_2yr_value = eps_result['quarterly_projections'][7]['estimated_value']  # 8th quarter (2 years)
-        weighted_2yr_value = weighted_result['quarterly_projections'][7]['weighted_value']  # 8th quarter (2 years)
+        fcf_2yr_value = fcf_result['growth_path'][10]['value']  # 11th year (2 years)
+        eps_2yr_value = eps_result['projected_eps'][10]  # 11th year (2 years)
+        weighted_2yr_value = weighted_result['quarterly_projections'][10]['weighted_value']  # 11th quarter (2 years)
         
         fcf_2yr_entry = calculate_entry_price(
             current_price=current_price,

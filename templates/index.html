@@ -3,487 +3,646 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hopper - Stock Valuation Analysis Tool</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Hopper - Valuation Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='images/bun.png') }}" type="image/png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.27.1/plotly.min.js"></script>
 </head>
 <body>
-    <!-- Header with Logo -->
-    <header class="site-header">
-        <div class="container">
-            <div class="row align-items-center py-3">
-                <div class="col-auto">
-                    <div class="logo-container">
-                        <img src="{{ url_for('static', filename='images/bun.png') }}" alt="Logo" class="logo">
-                    </div>
-                </div>
-                <div class="col">
-                    <h1 class="site-title mb-0"> Hopper - Stock Valuation Analysis Tool</h1>
-                </div>
-                <div class="col-auto">
-                    <button class="btn btn-primary features-menu-btn">
-                        <i class="fas fa-bars"></i> Features
-                    </button>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <!-- Features Menu -->
-    <div class="features-menu">
-        <div class="features-menu-inner">
-            <div class="features-menu-header">
-                <h2>Features</h2>
-                <button class="close-menu-btn">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="features-list">
-                <div class="feature-item">
-                    <i class="fas fa-chart-line"></i>
-                    <h3>EPS Valuation</h3>
-                    <p>Advanced earnings-based valuation with growth projections</p>
-                </div>
-                <div class="feature-item">
-                    <i class="fas fa-money-bill-wave"></i>
-                    <h3>FCF Analysis</h3>
-                    <p>Free cash flow analysis with custom growth rates</p>
-                </div>
-                <div class="feature-item">
-                    <i class="fas fa-calculator"></i>
-                    <h3>Entry Price Calculator</h3>
-                    <p>Calculate optimal entry prices for desired returns</p>
-                </div>
-                <div class="feature-item">
-                    <i class="fas fa-chart-bar"></i>
-                    <h3>Multiple Valuation Methods</h3>
-                    <p>Combine EPS, FCF, and EV/EBITDA approaches</p>
-                </div>
-                <div class="feature-item">
-                    <i class="fas fa-table"></i>
-                    <h3>Sensitivity Analysis</h3>
-                    <p>Interactive tables showing valuation sensitivity</p>
-                </div>
-                <div class="feature-item">
-                    <i class="fas fa-project-diagram"></i>
-                    <h3>Price Projections</h3>
-                    <p>Visual future price and metrics projections</p>
-                </div>
+    <!-- App Splash Screen -->
+    <div id="splashScreen" class="splash-screen">
+        <div class="splash-content">
+            <img src="{{ url_for('static', filename='images/bun.png') }}" alt="Hopper Logo" width="120" height="120">
+            <h1>Hopper Valuation</h1>
+            <p>Advanced Stock Valuation Tool</p>
+            <div class="spinner-border text-light mt-3" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
         </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="container mt-4">
-        <div class="row">
-            <!-- Input Form -->
-            <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h3>Valuation Parameters</h3>
+    <!-- Main App Content -->
+    <div id="appContent" class="app-content d-none">
+        <div class="container-fluid main-container">
+            <nav class="navbar navbar-expand-lg navbar-dark">
+                <div class="container-fluid">
+                    <a class="navbar-brand d-flex align-items-center" href="#">
+                        <img src="{{ url_for('static', filename='images/bun.png') }}" alt="Hopper Logo" width="40" height="40">
+                        <span class="logo-text">Hopper Valuation</span>
+                    </a>
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="navbarNav">
+                        <ul class="navbar-nav ms-auto">
+                            <li class="nav-item">
+                                <a class="nav-link active" href="#"></i> Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" id="featuresBtn"></i> Features</a>
+                            </li>
+                        </ul>
                     </div>
-                    <div class="card-body">
-                        <form id="valuation-form">
-                            <div class="mb-3">
-                                <label for="symbol" class="form-label">Stock Symbol</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control" id="symbol" name="symbol" value="AAPL" required>
-                                    <button type="button" class="btn btn-outline-secondary" id="symbol-search">
+                </div>
+            </nav>
+            
+            <div class="row mt-4 mx-0">
+                <!-- Search Section -->
+                <div class="col-12 mb-4">
+                    <div class="search-container">
+                        <div class="search-box">
+                            <div class="input-group input-group-lg">
+                                <input type="text" class="form-control" id="stockSymbol" placeholder="Enter stock symbol (e.g., AAPL)">
+                                <button class="btn btn-primary" type="button" id="searchBtn">
                                         <i class="bi bi-search"></i> Search
                                     </button>
-                                </div>
-                                <div class="form-text">Enter a valid stock symbol (e.g., AAPL, MSFT) and press Search or Enter</div>
                             </div>
-
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label for="fcf-growth" class="form-label">FCF Growth Rate (%)</label>
-                                    <input type="number" class="form-control" id="fcf-growth" name="fcf_growth" value="15" min="0" max="100" step="0.1">
                                 </div>
-                                <div class="col-md-6">
-                                    <label for="eps-growth" class="form-label">EPS Growth Rate (%)</label>
-                                    <input type="number" class="form-control" id="eps-growth" name="eps_growth" value="20" min="0" max="100" step="0.1">
                                 </div>
                             </div>
 
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label for="ebitda-growth" class="form-label">EBITDA Growth Rate (%)</label>
-                                    <input type="number" class="form-control" id="ebitda-growth" name="ebitda_growth" value="18" min="0" max="100" step="0.1">
+                <div class="col-lg-3">
+                    <!-- Valuation Parameters -->
+                    <div class="card parameters-card">
+                        <div class="card-header">
+                            <i class="bi bi-sliders"></i> Valuation Parameters
                                 </div>
-                                <div class="col-md-6">
-                                    <label for="fcf-yield" class="form-label">FCF Yield (%)</label>
-                                    <input type="number" class="form-control" id="fcf-yield" name="fcf_yield" value="4" min="0.1" max="20" step="0.1">
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label for="terminal-pe" class="form-label">Terminal P/E Ratio</label>
-                                    <input type="number" class="form-control" id="terminal-pe" name="terminal_pe" value="15" min="1" max="100" step="0.1">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="desired-return" class="form-label">Desired Return (%)</label>
-                                    <input type="number" class="form-control" id="desired-return" name="desired_return" value="15" min="1" max="50" step="0.1">
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label for="eps-multiple" class="form-label">EPS Multiple (P/E)</label>
-                                    <input type="number" class="form-control" id="eps-multiple" name="eps_multiple" value="20" min="1" max="100" step="0.1">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="projection-years" class="form-label">Projection Years</label>
-                                    <select class="form-select" id="projection-years" name="projection_years">
-                                        <option value="2">2 Years</option>
-                                        <option value="5" selected>5 Years</option>
-                                        <option value="10">10 Years</option>
-                                    </select>
+                        <div class="card-body">
+                            <form id="valuationForm">
+                                <div class="accordion" id="parametersAccordion">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#growthSection">
+                                                Growth Rates
+                                            </button>
+                                        </h2>
+                                        <div id="growthSection" class="accordion-collapse collapse show" data-bs-parent="#parametersAccordion">
+                                            <div class="accordion-body">
+                                                <div class="mb-3">
+                                                    <label for="fcfGrowth" class="form-label">FCF Growth (%)</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="fcfGrowth" value="15">
+                                                        <span class="input-group-text">%</span>
                                 </div>
                             </div>
 
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label for="years" class="form-label">Calculation Years</label>
-                                    <input type="number" class="form-control" id="years" name="years" value="5" min="1" max="20" step="1">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="sbc-impact" class="form-label">SBC Impact (%)</label>
-                                    <input type="number" class="form-control" id="sbc-impact" name="sbc_impact" value="0" min="0" max="100" step="0.1">
+                                                <div class="mb-3">
+                                                    <label for="epsGrowth" class="form-label">EPS Growth (%)</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="epsGrowth" value="20">
+                                                        <span class="input-group-text">%</span>
                                 </div>
                             </div>
 
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <label for="fcf-weight" class="form-label">FCF Weight (%)</label>
-                                    <input type="number" class="form-control" id="fcf-weight" name="fcf_weight" value="50" min="0" max="100" step="1">
+                                                <div class="mb-3">
+                                                    <label for="ebitdaGrowth" class="form-label">EBITDA Growth (%)</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="ebitdaGrowth" value="18">
+                                                        <span class="input-group-text">%</span>
                                 </div>
-                                <div class="col-md-4">
-                                    <label for="eps-weight" class="form-label">EPS Weight (%)</label>
-                                    <input type="number" class="form-control" id="eps-weight" name="eps_weight" value="30" min="0" max="100" step="1">
+                            </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <label for="ev-ebitda-weight" class="form-label">EV/EBITDA Weight (%)</label>
-                                    <input type="number" class="form-control" id="ev-ebitda-weight" name="ev_ebitda_weight" value="20" min="0" max="100" step="1">
+                                </div>
+                            </div>
+
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#valMultiples">
+                                                Valuation Multiples
+                                            </button>
+                                        </h2>
+                                        <div id="valMultiples" class="accordion-collapse collapse" data-bs-parent="#parametersAccordion">
+                                            <div class="accordion-body">
+                                                <div class="mb-3">
+                                                    <label for="fcfYield" class="form-label">FCF Yield (%)</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="fcfYield" value="4">
+                                                        <span class="input-group-text">%</span>
                                 </div>
                             </div>
                             
-                            <div class="mb-2 text-end">
-                                <span>Total Weight: <span id="weight-total" class="fw-bold">100%</span></span>
+                                                <div class="mb-3">
+                                                    <label for="terminalPE" class="form-label">Terminal P/E</label>
+                                                    <input type="number" class="form-control" id="terminalPE" value="15">
                             </div>
 
-                            <div class="mb-3 form-check">
-                                <input type="checkbox" class="form-check-input" id="use-ev-ebitda" name="use_ev_ebitda" checked>
-                                <label class="form-check-label" for="use-ev-ebitda">Include EV/EBITDA Valuation</label>
+                                                <div class="mb-3">
+                                                    <label for="epsMultiple" class="form-label">EPS Multiple (P/E)</label>
+                                                    <input type="number" class="form-control" id="epsMultiple" value="20">
                             </div>
-
-                            <div class="mb-3 form-check">
-                                <input type="checkbox" class="form-check-input" id="sensitivity" name="sensitivity">
-                                <label class="form-check-label" for="sensitivity">Include Sensitivity Analysis</label>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary w-100">Calculate Valuation</button>
-                        </form>
                     </div>
                 </div>
             </div>
 
-            <!-- Results Section -->
-            <div class="col-md-8">
-                <div id="loading" class="text-center d-none">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#projectionSettings">
+                                                Projection Settings
+                                            </button>
+                                        </h2>
+                                        <div id="projectionSettings" class="accordion-collapse collapse" data-bs-parent="#parametersAccordion">
+                                            <div class="accordion-body">
+                                                <div class="mb-3">
+                                                    <label for="projectionYears" class="form-label">Projection Years</label>
+                                                    <select class="form-select" id="projectionYearsSelect">
+                                                        <option value="5" selected>5 Years</option>
+                                                        <option value="10">10 Years</option>
+                                                        <option value="3">3 Years</option>
+                                                    </select>
+                                                    <input type="hidden" id="projectionYears" value="5">
                     </div>
-                    <p>Calculating valuation...</p>
+
+                                                <div class="mb-3">
+                                                    <label for="calculationYears" class="form-label">Calculation Years</label>
+                                                    <input type="number" class="form-control" id="calculationYears" value="5">
                 </div>
 
-                <div id="results-container" class="d-none">
-                    <!-- Market Data Card -->
-                    <div class="card mb-4">
-                        <div class="card-header bg-info text-white">
-                            <h3 id="market-data-title">AAPL - Market Data</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <table class="table table-sm">
-                                        <tr>
-                                            <th>Current Price:</th>
-                                            <td id="current-price"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>Shares Outstanding:</th>
-                                            <td id="shares-outstanding"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>Free Cash Flow (TTM):</th>
-                                            <td id="fcf"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>Net Income (TTM):</th>
-                                            <td id="net-income"></td>
-                                        </tr>
-                                    </table>
+                                                <div class="mb-3">
+                                                    <label for="sbcImpact" class="form-label">SBC Impact (%)</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="sbcImpact" value="0">
+                                                        <span class="input-group-text">%</span>
                                 </div>
-                                <div class="col-md-6">
-                                    <table class="table table-sm">
-                                        <tr>
-                                            <th>EBITDA (TTM):</th>
-                                            <td id="ebitda"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>FCF/Share (TTM):</th>
-                                            <td id="fcf-per-share"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>EPS (TTM):</th>
-                                            <td id="eps"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>P/E (TTM):</th>
-                                            <td id="pe-ratio"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>Net Debt:</th>
-                                            <td id="net-debt"></td>
-                                        </tr>
-                                    </table>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Valuation Summary Card -->
-                    <div class="card mb-4">
-                        <div class="card-header bg-success text-white">
-                            <h3>Valuation Summary</h3>
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#weightSection">
+                                                Model Weights
+                                            </button>
+                                        </h2>
+                                        <div id="weightSection" class="accordion-collapse collapse" data-bs-parent="#parametersAccordion">
+                                            <div class="accordion-body">
+                                                <div class="mb-3">
+                                                    <label for="fcfWeight" class="form-label">FCF Model Weight</label>
+                                                    <div class="input-group">
+                                                        <input type="range" class="form-range" id="fcfWeightRange" min="0" max="100" value="50">
+                                                        <input type="number" class="form-control ms-2 weight-input" id="fcfWeight" value="50">
+                                                        <span class="input-group-text">%</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label for="epsWeight" class="form-label">EPS Model Weight</label>
+                                                    <div class="input-group">
+                                                        <input type="range" class="form-range" id="epsWeightRange" min="0" max="100" value="30">
+                                                        <input type="number" class="form-control ms-2 weight-input" id="epsWeight" value="30">
+                                                        <span class="input-group-text">%</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label for="evEbitdaWeight" class="form-label">EV/EBITDA Weight</label>
+                                                    <div class="input-group">
+                                                        <input type="range" class="form-range" id="evEbitdaWeightRange" min="0" max="100" value="20">
+                                                        <input type="number" class="form-control ms-2 weight-input" id="evEbitdaWeight" value="20">
+                                                        <span class="input-group-text">%</span>
+                        </div>
+                                        </div>
+                                                
+                                                <div id="totalWeightDisplay" class="alert alert-info mt-2">
+                                                    Total Weight: <span id="totalWeight">100</span>%
+                                            </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="includeEvEbitda" checked>
+                                        <label class="form-check-label" for="includeEvEbitda">Include EV/EBITDA Model</label>
+                                    </div>
+
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="includeSensitivity">
+                                        <label class="form-check-label" for="includeSensitivity">Include Sensitivity Analysis</label>
+                                    </div>
+                                </div>
+
+                                <button type="button" id="calculateBtn" class="btn btn-primary w-100" disabled>
+                                    <i class="bi bi-calculator"></i> Calculate Valuation
+                                </button>
+                            </form>
+                                </div>
+                            </div>
+                                </div>
+
+                <div class="col-lg-9 mt-4 mt-lg-0">
+                    <div id="loadingOverlay" class="d-none">
+                        <div class="spinner-container">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Fetching data...</p>
+                        </div>
+                    </div>
+
+                    <div id="contentContainer">
+                        <!-- Stock Data Card -->
+                        <div class="card mb-4 market-data-card d-none" id="marketDataCard">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="bi bi-info-circle"></i> <span id="symbolHeader">Market Data</span>
+                                </div>
+                                <div class="stock-price">
+                                    <span id="currentPrice">$0.00</span>
+                                </div>
                         </div>
                         <div class="card-body">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
+                                <div class="row metrics-row">
+                                    <div class="col-md-3 col-6 metric-item">
+                                        <div class="metric-label">Shares Outstanding</div>
+                                        <div class="metric-value" id="sharesOutstanding">0</div>
+                                        </div>
+                                    <div class="col-md-3 col-6 metric-item">
+                                        <div class="metric-label">Free Cash Flow</div>
+                                        <div class="metric-value" id="fcf">$0</div>
+                                        </div>
+                                    <div class="col-md-3 col-6 metric-item">
+                                        <div class="metric-label">FCF/Share</div>
+                                        <div class="metric-value" id="fcfPerShare">$0.00</div>
+                                        </div>
+                                    <div class="col-md-3 col-6 metric-item">
+                                        <div class="metric-label">Net Debt</div>
+                                        <div class="metric-value" id="netDebt">$0</div>
+                                    </div>
+                                    <div class="col-md-3 col-6 metric-item">
+                                        <div class="metric-label">EBITDA</div>
+                                        <div class="metric-value" id="ebitda">$0</div>
+                                </div>
+                                    <div class="col-md-3 col-6 metric-item">
+                                        <div class="metric-label">Net Income</div>
+                                        <div class="metric-value" id="netIncome">$0</div>
+                                        </div>
+                                    <div class="col-md-3 col-6 metric-item">
+                                        <div class="metric-label">EPS</div>
+                                        <div class="metric-value" id="eps">$0.00</div>
+                                        </div>
+                                    <div class="col-md-3 col-6 metric-item">
+                                        <div class="metric-label">P/E Ratio</div>
+                                        <div class="metric-value" id="peRatio">0.0x</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="resultsContainer" class="d-none">
+                            <!-- Valuation Results Card -->
+                            <div class="card mb-4 valuation-card">
+                                <div class="card-header">
+                                    <i class="bi bi-graph-up-arrow"></i> Valuation Results
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="table-responsive">
+                                                <table class="table table-hover" id="valuationTable">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Model</th>
+                                                            <th>Intrinsic Value</th>
+                                                            <th>Implied Return</th>
+                                                            <th class="text-center">Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr id="fcfRow">
+                                                            <td><i class="bi bi-cash-stack"></i> DCF Model</td>
+                                                            <td id="fcfValue" class="fw-bold">$0.00</td>
+                                                            <td id="fcfReturn"><span class="status-text"></span> <span class="return-value"></span></td>
+                                                            <td class="text-center"><span class="status-indicator"></span></td>
+                                                        </tr>
+                                                        <tr id="epsRow">
+                                                            <td><i class="bi bi-piggy-bank"></i> P/E Model</td>
+                                                            <td id="epsValue" class="fw-bold">$0.00</td>
+                                                            <td id="epsReturn"><span class="status-text"></span> <span class="return-value"></span></td>
+                                                            <td class="text-center"><span class="status-indicator"></span></td>
+                                                        </tr>
+                                                        <tr id="evEbitdaRow">
+                                                            <td><i class="bi bi-building"></i> EV/EBITDA Model</td>
+                                                            <td id="evEbitdaValue" class="fw-bold">$0.00</td>
+                                                            <td id="evEbitdaReturn"><span class="status-text"></span> <span class="return-value"></span></td>
+                                                            <td class="text-center"><span class="status-indicator"></span></td>
+                                                        </tr>
+                                                        <tr id="weightedRow" class="table-primary">
+                                                            <td><i class="bi bi-star-fill"></i> <strong>Weighted Average</strong></td>
+                                                            <td id="weightedValue" class="fw-bold">$0.00</td>
+                                                            <td id="weightedReturn"><span class="status-text"></span> <span class="return-value"></span></td>
+                                                            <td class="text-center"><span class="status-indicator"></span></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="wacc-container">
+                                                <h5><i class="bi bi-percent"></i> WACC Components</h5>
+                                                <table class="table table-sm" id="waccComponentsTable">
+                                                    <tr>
+                                                        <td>Beta:</td>
+                                                        <td id="betaValue" class="text-end">0.00</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Risk-Free Rate:</td>
+                                                        <td id="riskFreeRateValue" class="text-end">0.00%</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Debt-to-Equity:</td>
+                                                        <td id="debtToEquityValue" class="text-end">0.00</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Cost of Debt:</td>
+                                                        <td id="costOfDebtValue" class="text-end">0.00%</td>
+                                                    </tr>
+                                                    <tr class="wacc-result">
+                                                        <td>Calculated WACC:</td>
+                                                        <td id="calculatedWaccValue" class="text-end fw-bold">0.00%</td>
+                                                    </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                            <!-- Tabs for projections and analysis -->
+                            <ul class="nav nav-tabs" id="analysisTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="projections-tab" data-bs-toggle="tab" data-bs-target="#projections" type="button" role="tab">
+                                        <i class="bi bi-graph-up"></i> Projections
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="sensitivity-tab" data-bs-toggle="tab" data-bs-target="#sensitivity" type="button" role="tab">
+                                        <i class="bi bi-grid-3x3"></i> Sensitivity Analysis
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="charts-tab" data-bs-toggle="tab" data-bs-target="#charts" type="button" role="tab">
+                                        <i class="bi bi-bar-chart"></i> Charts
+                                    </button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content" id="analysisTabContent">
+                                <!-- Projections Tab -->
+                                <div class="tab-pane fade show active" id="projections" role="tabpanel">
                                     <div class="card">
-                                        <div class="card-header bg-light">
-                                            <h5 class="mb-0">Calculation Results</h5>
-                                        </div>
                                         <div class="card-body">
-                                            <div class="d-flex justify-content-between mb-2">
-                                                <strong>Return from today's price:</strong>
-                                                <span id="return-from-today" class="fw-bold"></span>
-                                            </div>
-                                            <div class="d-flex justify-content-between">
-                                                <strong>Entry Price for <span id="desired-return-display">15</span>% Return:</strong>
-                                                <span id="entry-price-display" class="fw-bold"></span>
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <h5 class="card-title">FCF/Share Projections</h5>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm" id="fcfProjectionsTable">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Year</th>
+                                                                    <th>Value</th>
+                                                                    <th>Growth</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody></tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <h5 class="card-title">EPS Projections</h5>
+                                    <div class="table-responsive">
+                                                        <table class="table table-sm" id="epsProjectionsTable">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Year</th>
+                                                                    <th>Value</th>
+                                                                    <th>Growth</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                                <div class="col-md-4">
+                                                    <h5 class="card-title">EBITDA Projections</h5>
+                                    <div class="table-responsive">
+                                                        <table class="table table-sm" id="ebitdaProjectionsTable">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Year</th>
+                                                                    <th>Value</th>
+                                                                    <th>Growth</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody></tbody>
+                                        </table>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <div id="price-chart-container" style="height: 150px;">
-                                        <canvas id="price-projection-chart"></canvas>
+                                
+                                <!-- Sensitivity Analysis Tab -->
+                                <div class="tab-pane fade" id="sensitivity" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="alert alert-info" id="sensitivityAlert">
+                                                <i class="bi bi-info-circle"></i> Enable sensitivity analysis in the parameters to view this section.
+                                            </div>
+                                            <div id="sensitivityContent" class="d-none">
+                                                <ul class="nav nav-pills mb-3" id="sensitivityPills" role="tablist">
+                                                    <li class="nav-item" role="presentation">
+                                                        <button class="nav-link active" id="fcf-growth-tab" data-bs-toggle="pill" data-bs-target="#fcfGrowthSensitivity" type="button" role="tab">FCF Growth</button>
+                                                    </li>
+                                                    <li class="nav-item" role="presentation">
+                                                        <button class="nav-link" id="eps-growth-tab" data-bs-toggle="pill" data-bs-target="#epsGrowthSensitivity" type="button" role="tab">EPS Growth</button>
+                                                    </li>
+                                                    <li class="nav-item" role="presentation">
+                                                        <button class="nav-link" id="wacc-tab" data-bs-toggle="pill" data-bs-target="#waccSensitivity" type="button" role="tab">WACC Analysis</button>
+                                                    </li>
+                                                </ul>
+                                                
+                                                <div class="tab-content" id="sensitivityPillsContent">
+                                                    <div class="tab-pane fade show active" id="fcfGrowthSensitivity" role="tabpanel">
+                                                        <h5 class="card-title">FCF Growth Rate Sensitivity</h5>
+                                                        <div class="table-responsive">
+                                                            <table class="table table-sm table-bordered" id="fcfGrowthSensitivityTable"></table>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="tab-pane fade" id="epsGrowthSensitivity" role="tabpanel">
+                                                        <h5 class="card-title">EPS Growth Rate Sensitivity</h5>
+                                                        <div class="table-responsive">
+                                                            <table class="table table-sm table-bordered" id="epsGrowthSensitivityTable"></table>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="tab-pane fade" id="waccSensitivity" role="tabpanel">
+                                                        <h5 class="card-title">WACC Sensitivity Analysis</h5>
+                                    <div class="table-responsive">
+                                                            <table class="table table-sm table-bordered" id="waccSensitivityTable"></table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Charts Tab -->
+                                <div class="tab-pane fade" id="charts" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6 mb-4">
+                                                    <div class="chart-wrapper" style="position: relative; height: 400px;">
+                                                        <canvas id="fcfProjectionGraph"></canvas>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6 mb-4">
+                                                    <div class="chart-wrapper" style="position: relative; height: 400px;">
+                                                        <canvas id="epsProjectionGraph"></canvas>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="row">
-                                <div class="col-md-12">
-                                    <table class="table table-bordered" id="valuation-summary">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Valuation Method</th>
-                                                <th>Intrinsic Value</th>
-                                                <th>Entry Price (<span id="table-desired-return">15</span>% Return)</th>
-                                                <th>Implied Return</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <!-- Filled by JavaScript -->
-                                        </tbody>
-                                    </table>
+                        </div>
+                        
+                        <!-- Introduction Card (shown when no data is loaded) -->
+                        <div class="card intro-card" id="introCard">
+                            <div class="card-body text-center">
+                                <!--<i class="bi bi-search-heart display-1 text-primary mb-3"></i> -->
+                                <h3>Welcome to Hopper Valuation Tool</h3>
+                                <p class="lead">Search for a stock symbol above to begin your analysis</p>
+                                <div class="features-overview mt-4">
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <div class="feature-item">
+                                                <i class="bi bi-cash-coin"></i>
+                                                <h5>Advanced DCF Model</h5>
+                                                <p>Uses regression analysis on historical cash flows</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <div class="feature-item">
+                                                <i class="bi bi-currency-exchange"></i>
+                                                <h5>Multi-Model Approach</h5>
+                                                <p>Combines DCF, P/E, and EV/EBITDA methods</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <div class="feature-item">
+                                                <i class="bi bi-calculator"></i>
+                                                <h5>Dynamic WACC</h5>
+                                                <p>Incorporates beta, risk-free rate, and cost of debt</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+            
+            <footer class="mt-5 py-3 text-center">
+                <p>&copy; 2025 Hopper Valuation Tool. All rights reserved.<br>
+                Disclamer : This is for educational purposes only. It is not financial advice. <br>
+                </p>
+            </footer>
+        </div>
 
-                    <!-- Projections Card -->
-                    <div class="card mb-4">
-                        <div class="card-header bg-warning">
-                            <h3>Projections</h3>
+        <!-- Features Modal -->
+        <div class="modal fade" id="featuresModal" tabindex="-1" aria-labelledby="featuresModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="featuresModalLabel">Advanced Valuation Features</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="feature-detail">
+                                    <i class="bi bi-graph-up-arrow feature-icon"></i>
+                                    <h5>Enhanced DCF Model</h5>
+                                    <ul>
+                                        <li>Regression analysis of historical cash flows</li>
+                                        <li>Industry benchmarks for realistic growth rates</li>
+                                        <li>Dynamic WACC calculation using CAPM</li>
+                                        <li>Tapering growth rates over time</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-detail">
+                                    <i class="bi bi-layers feature-icon"></i>
+                                    <h5>Multi-Method Approach</h5>
+                                    <ul>
+                                        <li>DCF model for cash-flow focused valuation</li>
+                                        <li>P/E model using earnings projections</li>
+                                        <li>EV/EBITDA for comparative analysis</li>
+                                        <li>Weighted average for balanced result</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <ul class="nav nav-tabs" id="projectionTabs" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="five-year-tab" data-bs-toggle="tab" data-bs-target="#five-year" type="button" role="tab" aria-controls="five-year" aria-selected="true">5-Year Projections</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="two-year-tab" data-bs-toggle="tab" data-bs-target="#two-year" type="button" role="tab" aria-controls="two-year" aria-selected="false">2-Year Projections</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="quarterly-tab" data-bs-toggle="tab" data-bs-target="#quarterly" type="button" role="tab" aria-controls="quarterly" aria-selected="false">Quarterly Projections</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="graphs-tab" data-bs-toggle="tab" data-bs-target="#graphs" type="button" role="tab" aria-controls="graphs" aria-selected="false">Projection Graphs</button>
-                                </li>
-                            </ul>
-                            <div class="tab-content p-3" id="projectionTabsContent">
-                                <div class="tab-pane fade show active" id="five-year" role="tabpanel" aria-labelledby="five-year-tab">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <h5>FCF/Share Projections</h5>
-                                            <table class="table table-sm" id="fcf-projections">
-                                                <!-- Filled by JavaScript -->
-                                            </table>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h5>EPS Projections</h5>
-                                            <table class="table table-sm" id="eps-projections">
-                                                <!-- Filled by JavaScript -->
-                                            </table>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h5>EBITDA Projections</h5>
-                                            <table class="table table-sm" id="ebitda-projections">
-                                                <!-- Filled by JavaScript -->
-                                            </table>
-                                        </div>
-                                    </div>
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <div class="feature-detail">
+                                    <i class="bi bi-grid-3x3 feature-icon"></i>
+                                    <h5>Sensitivity Analysis</h5>
+                                    <ul>
+                                        <li>Test variations in growth rates</li>
+                                        <li>Analyze impact of different P/E multiples</li>
+                                        <li>WACC sensitivity with varying inputs</li>
+                                        <li>Color-coded results for quick insights</li>
+                                    </ul>
                                 </div>
-                                <div class="tab-pane fade" id="graphs" role="tabpanel" aria-labelledby="graphs-tab">
-                                    <div class="row">
-                                        <div class="col-md-6 mb-4">
-                                            <h5>FCF/Share Projection Graph</h5>
-                                            <canvas id="fcf-projection-chart" width="400" height="300"></canvas>
-                                        </div>
-                                        <div class="col-md-6 mb-4">
-                                            <h5>EPS Projection Graph</h5>
-                                            <canvas id="eps-projection-chart" width="400" height="300"></canvas>
-                                        </div>
-                                        <div class="col-md-6 mb-4">
-                                            <h5>EBITDA Projection Graph</h5>
-                                            <canvas id="ebitda-projection-chart" width="400" height="300"></canvas>
-                                        </div>
-                                        <div class="col-md-6 mb-4">
-                                            <h5>Combined Projections</h5>
-                                            <canvas id="combined-projection-chart" width="400" height="300"></canvas>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="two-year" role="tabpanel" aria-labelledby="two-year-tab">
-                                    <div class="row">
-                                        <div class="col-md-12">
-                                            <table class="table table-bordered">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th>Valuation Method</th>
-                                                        <th>2-Year Target</th>
-                                                        <th>Entry Price (15% Return)</th>
-                                                        <th>Implied Return</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <tr>
-                                                        <td>FCF-Based</td>
-                                                        <td id="fcf-2yr-value"></td>
-                                                        <td id="fcf-2yr-entry"></td>
-                                                        <td id="fcf-2yr-implied"></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>EPS-Based</td>
-                                                        <td id="eps-2yr-value"></td>
-                                                        <td id="eps-2yr-entry"></td>
-                                                        <td id="eps-2yr-implied"></td>
-                                                    </tr>
-                                                    <tr class="table-primary">
-                                                        <td><strong>Weighted Average</strong></td>
-                                                        <td id="weighted-2yr-value"></td>
-                                                        <td id="weighted-2yr-entry"></td>
-                                                        <td id="weighted-2yr-implied"></td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="quarterly" role="tabpanel" aria-labelledby="quarterly-tab">
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered" id="quarterly-projections">
-                                            <!-- Filled by JavaScript -->
-                                        </table>
-                                    </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-detail">
+                                    <i class="bi bi-calendar3 feature-icon"></i>
+                                    <h5>Detailed Projections</h5>
+                                    <ul>
+                                        <li>5-year cash flow projections</li>
+                                        <li>EPS growth visualization</li>
+                                        <li>Interactive charts for all metrics</li>
+                                        <li>Customizable calculation periods</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Sensitivity Analysis Card -->
-                    <div class="card mb-4" id="sensitivity-card">
-                        <div class="card-header bg-secondary text-white">
-                            <h3>Sensitivity Analysis</h3>
-                        </div>
-                        <div class="card-body">
-                            <ul class="nav nav-tabs" id="sensitivityTabs" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="fcf-growth-tab" data-bs-toggle="tab" data-bs-target="#fcf-growth-sensitivity" type="button" role="tab" aria-controls="fcf-growth-sensitivity" aria-selected="true">FCF Growth</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="eps-growth-tab" data-bs-toggle="tab" data-bs-target="#eps-growth-sensitivity" type="button" role="tab" aria-controls="eps-growth-sensitivity" aria-selected="false">EPS Growth</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="fcf-yield-tab" data-bs-toggle="tab" data-bs-target="#fcf-yield-sensitivity" type="button" role="tab" aria-controls="fcf-yield-sensitivity" aria-selected="false">FCF Yield</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="terminal-pe-tab" data-bs-toggle="tab" data-bs-target="#terminal-pe-sensitivity" type="button" role="tab" aria-controls="terminal-pe-sensitivity" aria-selected="false">Terminal P/E</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="discount-rate-tab" data-bs-toggle="tab" data-bs-target="#discount-rate-sensitivity" type="button" role="tab" aria-controls="discount-rate-sensitivity" aria-selected="false">Discount Rate</button>
-                                </li>
-                            </ul>
-                            <div class="tab-content p-3" id="sensitivityTabsContent">
-                                <div class="tab-pane fade show active" id="fcf-growth-sensitivity" role="tabpanel" aria-labelledby="fcf-growth-tab">
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered" id="fcf-growth-table">
-                                            <!-- Filled by JavaScript -->
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="eps-growth-sensitivity" role="tabpanel" aria-labelledby="eps-growth-tab">
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered" id="eps-growth-table">
-                                            <!-- Filled by JavaScript -->
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="fcf-yield-sensitivity" role="tabpanel" aria-labelledby="fcf-yield-tab">
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered" id="fcf-yield-table">
-                                            <!-- Filled by JavaScript -->
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="terminal-pe-sensitivity" role="tabpanel" aria-labelledby="terminal-pe-tab">
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered" id="terminal-pe-table">
-                                            <!-- Filled by JavaScript -->
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="discount-rate-sensitivity" role="tabpanel" aria-labelledby="discount-rate-tab">
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered" id="discount-rate-table">
-                                            <!-- Filled by JavaScript -->
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        // Show splash screen for 2 seconds then fade out
+        window.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                document.getElementById('splashScreen').classList.add('fade-out');
+                setTimeout(function() {
+                    document.getElementById('splashScreen').style.display = 'none';
+                    document.getElementById('appContent').classList.remove('d-none');
+                }, 500);
+            }, 2000);
+        });
+    </script>
 </body>
 </html>
