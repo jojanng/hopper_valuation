@@ -2,21 +2,14 @@ This is a python project for financial analysis and valuation of stocks.
 
 ## Features
 
-- **Market Data Service**: Multi-provider support with fallback strategy (Doesn't support ETF )
+- **Market Data Service**: Multi-provider support with fallback strategy
 - **Valuation Engine**: Multiple valuation models with customizable weights
 - **Analytics Engine**: FFT-based option pricing and market cycle detection (Not implemented)
-- **API Layer**: RESTful endpoints with authentication and rate limiting
 
 ## Getting Started
 
-### Prerequisites
 
-- Python 3.9+
-- PostgreSQL
-- Redis
-- TimescaleDB (optional)
-
-### Installation (Flask) - Working
+### Installation 
 
 1. Clone the repository
 2. Create and activate a virtual environment:

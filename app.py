@@ -155,7 +155,7 @@ def perform_valuation():
             "ebitda": ebitda,
             "fcf_per_share": fcf_per_share,
             "eps": eps,
-            "pe_ratio": pe_ratio,  # Add P/E ratio to market data
+            "pe_ratio": pe_ratio,
             "net_debt": net_debt
         }
         

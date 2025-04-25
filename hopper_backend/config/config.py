@@ -8,27 +8,6 @@ import os
 from typing import Dict, Any, Optional
 from pydantic import BaseSettings, Field
 
-class DatabaseSettings(BaseSettings):
-    """Database connection settings."""
-    host: str = Field(default="localhost", env="DB_HOST")
-    port: int = Field(default=5432, env="DB_PORT")
-    username: str = Field(default="postgres", env="DB_USER")
-    password: str = Field(default="postgres", env="DB_PASSWORD")
-    database: str = Field(default="hopper", env="DB_NAME")
-    
-    @property
-    def connection_string(self) -> str:
-        """Get the database connection string."""
-        return f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
-
-class TimescaleDBSettings(DatabaseSettings):
-    """TimescaleDB connection settings."""
-    host: str = Field(default="localhost", env="TIMESCALE_HOST")
-    port: int = Field(default=5432, env="TIMESCALE_PORT")
-    username: str = Field(default="postgres", env="TIMESCALE_USER")
-    password: str = Field(default="postgres", env="TIMESCALE_PASSWORD")
-    database: str = Field(default="hopper_timeseries", env="TIMESCALE_DB_NAME")
-
 class RedisSettings(BaseSettings):
     """Redis connection settings."""
     host: str = Field(default="localhost", env="REDIS_HOST")
@@ -54,9 +33,6 @@ class APISettings(BaseSettings):
 
 class MarketDataSettings(BaseSettings):
     """Market data provider settings."""
-    finnhub_api_key: Optional[str] = Field(default=None, env="FINNHUB_API_KEY")
-    alpha_vantage_api_key: Optional[str] = Field(default=None, env="ALPHA_VANTAGE_API_KEY")
-    polygon_api_key: Optional[str] = Field(default=None, env="POLYGON_API_KEY")
     default_provider: str = Field(default="yfinance", env="DEFAULT_MARKET_DATA_PROVIDER")
     cache_ttl: int = Field(default=3600, env="MARKET_DATA_CACHE_TTL")  # 1 hour
 
@@ -74,8 +50,6 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
     
     # Sub-settings
-    database: DatabaseSettings = DatabaseSettings()
-    timescale: TimescaleDBSettings = TimescaleDBSettings()
     redis: RedisSettings = RedisSettings()
     api: APISettings = APISettings()
     market_data: MarketDataSettings = MarketDataSettings()
