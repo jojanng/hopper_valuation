@@ -181,9 +181,17 @@ class YFinanceProvider:
             
             if not balance_sheet.empty:
                 if 'Total Debt' in balance_sheet.index:
-                    total_debt = balance_sheet.loc['Total Debt'].iloc[0]
+                    for col in balance_sheet.columns:
+                        value = balance_sheet.loc['Total Debt', col]
+                        if pd.notna(value):
+                            total_debt = float(value)
+                            break
                 elif 'Long Term Debt' in balance_sheet.index:
-                    total_debt = balance_sheet.loc['Long Term Debt'].iloc[0]
+                    for col in balance_sheet.columns:
+                        value = balance_sheet.loc['Long Term Debt', col]
+                        if pd.notna(value):
+                            total_debt = float(value)
+                            break
                 
                 if 'Cash And Cash Equivalents' in balance_sheet.index:
                     cash_and_equivalents = balance_sheet.loc['Cash And Cash Equivalents'].iloc[0]
@@ -191,21 +199,43 @@ class YFinanceProvider:
             # Get income statement data
             net_income = 0
             ebitda = 0
-            
+            interest_expense = None
             if not income_stmt.empty:
                 if 'Net Income' in income_stmt.index:
                     net_income = income_stmt.loc['Net Income'].iloc[0]
-                
                 if 'EBITDA' in income_stmt.index:
                     ebitda = income_stmt.loc['EBITDA'].iloc[0]
-            
-            # Calculate enterprise value
-            enterprise_value = market_cap + total_debt - cash_and_equivalents
-            
+                if 'Interest Expense' in income_stmt.index:
+                    # Iterate over columns to find the most recent non-NaN value
+                    for col in income_stmt.columns:
+                        value = income_stmt.loc['Interest Expense', col]
+                        if pd.notna(value):
+                            interest_expense = float(value)
+                            break
+
+            # Get total equity
+            total_equity = None
+            if not balance_sheet.empty:
+                if 'Total Stockholder Equity' in balance_sheet.index:
+                    for col in balance_sheet.columns:
+                        value = balance_sheet.loc['Total Stockholder Equity', col]
+                        if pd.notna(value):
+                            total_equity = float(value)
+                            break
+                elif 'Total Equity Gross Minority Interest' in balance_sheet.index:
+                    for col in balance_sheet.columns:
+                        value = balance_sheet.loc['Total Equity Gross Minority Interest', col]
+                        if pd.notna(value):
+                            total_equity = float(value)
+                            break
+
             # Get free cash flow
             fcf = None
             if not cashflow.empty and 'Free Cash Flow' in cashflow.index:
                 fcf = cashflow.loc['Free Cash Flow'].iloc[0]
+            
+            # Calculate enterprise value
+            enterprise_value = market_cap + total_debt - cash_and_equivalents
             
             return {
                 'symbol': symbol,
@@ -226,7 +256,9 @@ class YFinanceProvider:
                 'peRatio': info.get('trailingPE', None),
                 'balanceSheet': balance_sheet_dict,
                 'incomeStatement': income_stmt_dict,
-                'cashFlow': cashflow_dict
+                'cashFlow': cashflow_dict,
+                'interestExpense': interest_expense,
+                'totalEquity': total_equity
             }
         
         loop = asyncio.get_event_loop()

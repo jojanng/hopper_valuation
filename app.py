@@ -15,6 +15,7 @@ import logging
 from datetime import datetime, timedelta
 import numpy as np
 from flask import Flask, request, jsonify, render_template, send_from_directory
+import math
 
 # Add the parent directory to the path so we can import the hopper_backend package
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
@@ -116,6 +117,8 @@ def perform_valuation():
             total_debt = financial_data.get('totalDebt', 0)
             cash_and_equivalents = financial_data.get('cashAndEquivalents', 0)
             net_debt = total_debt - cash_and_equivalents
+            interest_expense = financial_data.get('interestExpense', None)
+            total_equity = financial_data.get('totalEquity', None)
             
             # Calculate per share metrics with safety checks
             if shares_outstanding <= 0:
@@ -139,6 +142,28 @@ def perform_valuation():
                 ebitda = ebitda * (1 - sbc_impact)
                 fcf_per_share = fcf / shares_outstanding
                 eps = net_income / shares_outstanding
+            
+            # --- NEW: Calculate cost_of_debt and debt_to_equity if not available ---
+            # These will override the values fetched later if they are None
+            logger.info(f"Raw values for manual WACC calculation: total_debt={total_debt}, total_equity={total_equity}, interest_expense={interest_expense}")
+            manual_cost_of_debt = None
+            manual_debt_to_equity = None
+            if interest_expense is not None and total_debt:
+                try:
+                    manual_cost_of_debt = float(interest_expense) / float(total_debt) if float(total_debt) != 0 else None
+                    if manual_cost_of_debt is not None and (math.isnan(manual_cost_of_debt) or manual_cost_of_debt < 0):
+                        logger.warning(f"Manual cost_of_debt is NaN or negative: {manual_cost_of_debt}, setting to None.")
+                        manual_cost_of_debt = None
+                except Exception as e:
+                    logger.warning(f"Error calculating manual cost_of_debt: {e}")
+            if total_debt is not None and total_equity:
+                try:
+                    manual_debt_to_equity = float(total_debt) / float(total_equity) if float(total_equity) != 0 else None
+                    if manual_debt_to_equity is not None and (math.isnan(manual_debt_to_equity) or manual_debt_to_equity < 0):
+                        logger.warning(f"Manual debt_to_equity is NaN or negative: {manual_debt_to_equity}, setting to None.")
+                        manual_debt_to_equity = None
+                except Exception as e:
+                    logger.warning(f"Error calculating manual debt_to_equity: {e}")
             
         except Exception as e:
             logger.error(f"Error fetching data for {symbol}: {str(e)}")
@@ -189,13 +214,20 @@ def perform_valuation():
         except Exception as e:
             logger.warning(f"Error fetching debt to equity: {str(e)}")
             debt_to_equity = 0.5  # Use 0.5 as default debt to equity
-            
+            # Use manual calculation if available
+            if manual_debt_to_equity is not None:
+                debt_to_equity = manual_debt_to_equity
+                logger.info(f"Using manually calculated debt_to_equity: {debt_to_equity}")
         try:
             cost_of_debt = run_async(market_data_service.get_cost_of_debt(symbol))
             logger.info(f"Cost of debt for {symbol}: {cost_of_debt}")
         except Exception as e:
             logger.warning(f"Error fetching cost of debt: {str(e)}")
             cost_of_debt = 0.05  # Use 5% as default cost of debt
+            # Use manual calculation if available
+            if manual_cost_of_debt is not None:
+                cost_of_debt = manual_cost_of_debt
+                logger.info(f"Using manually calculated cost_of_debt: {cost_of_debt}")
             
         beta = financial_data.get('beta', 1.0)
         logger.info(f"Beta for {symbol}: {beta}")
@@ -285,15 +317,23 @@ def perform_valuation():
                     cost_of_debt=cost_of_debt
                 ))
                 
-                fcf_valuation = {
-                    "intrinsic_value": dcf_result['per_share_value'],
-                    "estimated_value": dcf_result['per_share_value'],
-                    "projected_growth_rates": dcf_result.get('projected_growth_rates', []),
-                    "wacc": dcf_result.get('wacc', discount_rate)
-                }
+                per_share_value = dcf_result.get('per_share_value')
+                wacc_value = dcf_result.get('wacc', discount_rate)
+                if per_share_value is not None:
+                    logger.info(f"FCF valuation using enhanced DCF model: {per_share_value:.2f}")
+                else:
+                    logger.info("FCF valuation using enhanced DCF model: N/A")
+                if wacc_value is not None:
+                    logger.info(f"Using WACC: {wacc_value:.2%}")
+                else:
+                    logger.info("Using WACC: N/A")
                 
-                logger.info(f"FCF valuation using enhanced DCF model: {dcf_result['per_share_value']:.2f}")
-                logger.info(f"Using WACC: {dcf_result.get('wacc', discount_rate):.2%}")
+                fcf_valuation = {
+                    "intrinsic_value": per_share_value,
+                    "estimated_value": per_share_value,
+                    "projected_growth_rates": dcf_result.get('projected_growth_rates', []),
+                    "wacc": wacc_value
+                }
                 
             except Exception as e:
                 logger.error(f"Error in FCF valuation: {str(e)}")
